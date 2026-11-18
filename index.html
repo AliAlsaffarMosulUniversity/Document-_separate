@@ -252,6 +252,15 @@ html .crow input[type=text]{border-color:var(--frame)}
 html .gold{border:1.5px solid var(--frame)}
 html .nav{border:1.5px solid var(--frame)}
 html .tsw input:focus-visible+.tr{outline-color:var(--frame)}
+/* الاقتراح */
+#sugg{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sgx{font-size:12.5px;color:var(--mut)}
+.sugchip{padding:4px 12px;border-radius:99px;font-weight:800;font-size:12.5px;color:#101820;background:var(--col);border:2px dashed var(--frame);cursor:pointer;animation:pulse 1.6s infinite}
+.sugchip:hover{filter:brightness(1.1)}
+@keyframes pulse{50%{box-shadow:0 0 0 4px #fff4}}
+.cat.sg{outline:3px dashed var(--col);outline-offset:3px;animation:sgp 1.4s infinite}
+.cat.sg::before{content:"💡";position:absolute;top:-11px;inset-inline-end:8px;font-size:15px;z-index:2}
+@keyframes sgp{50%{outline-offset:6px}}
 /* مفتاح الوضع */
 .tsw{position:relative;display:inline-block;cursor:pointer;flex:none}
 .tsw input{position:absolute;opacity:0;width:0;height:0}
@@ -346,6 +355,7 @@ body,header,aside,.cside,.card,.hbtn,.cat,#stateBar,#optBar{transition:backgroun
       <span id="pos"></span>
       <span id="fname"></span>
       <div id="chips"></div>
+      <span id="sugg"></span>
       <button class="sbtn" id="btnSave" title="حفظ التدوير والقص في الصورة">💾 حفظ التعديل</button>
       <button class="sbtn" id="btnOne">⬇ تحميل هذه الصورة</button>
       <button class="sbtn" id="btnOrig">↩ الأصل</button>
@@ -357,6 +367,8 @@ body,header,aside,.cside,.card,.hbtn,.cat,#stateBar,#optBar{transition:backgroun
       <button class="link" id="btnManage">✏️ تعديل الأزرار</button>
       <label><input type="checkbox" id="optAuto"> الانتقال للتالي بعد كل نقرة</label>
       <label><input type="checkbox" id="optMulti" checked> أكثر من جانب للملف الواحد</label>
+      <label><input type="checkbox" id="optOcr" checked> قراءة الصور ضوئيًا (OCR)</label>
+      <label><input type="checkbox" id="optAutoSug"> تطبيق الاقتراح تلقائيًا عند الثقة العالية</label>
       <small id="linkStat"></small>
       <small id="catHint"></small>
     </div>
@@ -396,6 +408,10 @@ body,header,aside,.cside,.card,.hbtn,.cat,#stateBar,#optBar{transition:backgroun
   <h3>الربط بمجلد الحاسوب <button class="x" data-close>✕</button></h3>
   <div class="bd" id="linkBody"></div>
   <div class="ft" id="linkFt"></div>
+</div></div>
+<div class="modal" id="mTxt"><div class="card" style="width:min(680px,100%)">
+  <h3>النص المستخرج من الملف <button class="x" data-close>✕</button></h3>
+  <div class="bd"><div class="msg" id="txtInfo"></div><pre id="txtBody" style="white-space:pre-wrap;line-height:1.9;max-height:55vh;overflow:auto;background:var(--panel2);padding:12px;border-radius:10px;font-family:inherit;unicode-bidi:plaintext"></pre></div>
 </div></div>
 <div class="modal" id="mDel"><div class="card" style="width:min(460px,100%)">
   <h3>حذف جميع الملفات <button class="x" data-close>✕</button></h3>
@@ -448,10 +464,12 @@ function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 cats=lsGet(LS+".cats")||JSON.parse(JSON.stringify(DEFAULT_CATS));
 saved=lsGet(LS+".assign")||{};
-const opts=lsGet(LS+".opts")||{auto:false,multi:true};
-$("optAuto").checked=opts.auto;$("optMulti").checked=opts.multi;
-function saveOpts(){lsSet(LS+".opts",{auto:$("optAuto").checked,multi:$("optMulti").checked})}
+const opts=Object.assign({auto:false,multi:true,ocr:true,autoSug:false},lsGet(LS+".opts")||{});
+$("optAuto").checked=opts.auto;$("optMulti").checked=opts.multi;$("optOcr").checked=opts.ocr;$("optAutoSug").checked=opts.autoSug;
+function saveOpts(){lsSet(LS+".opts",{auto:$("optAuto").checked,multi:$("optMulti").checked,ocr:$("optOcr").checked,autoSug:$("optAutoSug").checked})}
 $("optAuto").onchange=$("optMulti").onchange=saveOpts;
+$("optOcr").onchange=()=>{saveOpts();if($("optOcr").checked){files.forEach(f=>{if(f.kind==="img"&&f.text==null){f.ocrOff=false}});if(cur>=0)analyze(files[cur])}else renderSugg()};
+$("optAutoSug").onchange=saveOpts;
 const keyOf=f=>f.name+"|"+f.size+"|"+f.lastModified;
 function persist(){
   files.forEach(f=>{ if(f.cats.size) saved[f.key]=[...f.cats]; else delete saved[f.key]; });
@@ -573,19 +591,21 @@ function show(i){
   tok++;$("docView").hidden=f.kind==="img";$("docView").innerHTML="";
   if(f.kind!=="img"){
     IMG.hidden=true;if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}
-    refreshAll();loadDoc(f,tok);
+    refreshAll();loadDoc(f,tok);analyze(f);
     const b=$("thList").children[i];b&&b.scrollIntoView({block:"nearest",behavior:"smooth"});return;
   }
   if(curUrl)URL.revokeObjectURL(curUrl);
   curUrl=URL.createObjectURL(f.file);rot=f.rot||0;
   IMG.hidden=false;IMG.onload=()=>{iw=IMG.naturalWidth;ih=IMG.naturalHeight;fit("fit")};
   IMG.src=curUrl;
+  analyze(f);
   // تحميل مسبق للتالية
   if(files[i+1]&&files[i+1].kind==="img"){const p=new Image();const u=URL.createObjectURL(files[i+1].file);p.onload=p.onerror=()=>URL.revokeObjectURL(u);p.src=u}
   refreshAll();
   const b=$("thList").children[i];b&&b.scrollIntoView({block:"nearest",behavior:"smooth"});
 }
 /* ===== عرض PDF / Word / غيرها ===== */
+const DOC_DZ=0.5;   // نسبة العرض الافتراضية لملفات PDF وWord
 let tok=0,dz=1,dtype="";
 const isImg=()=>cur>=0&&files[cur].kind==="img";
 function applyDoc(){
@@ -600,7 +620,7 @@ function applyDoc(){
   }
 }
 async function loadDoc(f,t){
-  const V=$("docView");dz=1;$("zTxt").textContent="100%";V.scrollTop=0;
+  const V=$("docView");dz=DOC_DZ;$("zTxt").textContent=Math.round(DOC_DZ*100)+"%";V.scrollTop=0;
   try{
     if(f.kind==="pdf"){
       const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.file.arrayBuffer())}).promise;
@@ -642,11 +662,11 @@ async function loadDoc(f,t){
 function go(i){if(files.length)show(Math.max(0,Math.min(files.length-1,i)))}
 function dims(){const r=rot%180!==0;return r?[ih,iw]:[iw,ih]}
 function fit(mode){
-  if(!isImg()){dz=1;if(cur>=0)applyDoc();return}
+  if(!isImg()){dz=mode==="width"?1:DOC_DZ;if(cur>=0)applyDoc();return}
   fitMode=mode;const W=STAGE.clientWidth,H=STAGE.clientHeight,[w,h]=dims();if(!w)return;
   const pad=70;
   sc=mode==="width"?(W-30)/w:Math.min((W-30)/w,(H-pad)/h);
-  sc=Math.min(sc,mode==="width"?10:2);
+  sc=mode==="width"?Math.min(sc,10):Math.min(sc,.5);
   tx=(W-w*sc)/2;ty=mode==="width"?10:(H-h*sc)/2+16;apply();
 }
 function apply(){
@@ -659,7 +679,7 @@ function apply(){
   $("zTxt").textContent=Math.round(sc*100)+"%";
 }
 function zoomAt(f,cx,cy){
-  if(!isImg()){dz=Math.max(.4,Math.min(4,dz*f));applyDoc();return}
+  if(!isImg()){dz=Math.max(.2,Math.min(4,dz*f));applyDoc();return}
   const n=Math.max(.05,Math.min(12,sc*f));f=n/sc;
   tx=cx-(cx-tx)*f;ty=cy-(cy-ty)*f;sc=n;fitMode="free";apply();
 }
@@ -759,6 +779,7 @@ function refreshAll(){
   $("thCount").textContent=n?n+" صورة":"";
   $("btnDl").disabled=!done;
   files.forEach((_,i)=>refreshThumb(i));
+  renderSugg();
 }
 const esc=s=>String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 
@@ -769,6 +790,7 @@ window.addEventListener("keydown",e=>{
   if(cropOn){if(e.key==="Enter"){e.preventDefault();applyCrop()}else if(e.key==="Escape")endCrop();return}
   const k=e.key;
   if(k==="c"||k==="C"||k==="ؤ"){startCrop();return}
+  if(k==="s"||k==="S"||k==="س"){const r=cur>=0&&suggestFor(files[cur]);if(r){toggle(r[0].id,true)}return}
   if(/^[1-9]$/.test(k)){const c=cats[+k-1];c&&toggle(c.id);e.preventDefault()}
   else if(k==="ArrowRight"||k===" "||k==="Enter"){go(cur+1);e.preventDefault()}
   else if(k==="ArrowLeft"){go(cur-1);e.preventDefault()}
@@ -787,6 +809,13 @@ document.querySelectorAll(".modal").forEach(m=>m.addEventListener("mousedown",e=
 $("btnHelp").onclick=()=>open("mHelp");
 
 /* إدارة الأزرار */
+function renderEditKw(B,c){
+  const kr=document.createElement("div");kr.className="crow";kr.style.margin="-4px 0 6px";
+  kr.innerHTML='<input type="text" style="font-size:12.5px">';
+  const k=kr.querySelector("input");k.placeholder="كلمات مفتاحية للاقتراح (افصل بينها بفاصلة)";k.value=kwFor(c);
+  k.oninput=()=>{c.kw=k.value;lsSet(LS+".cats",cats);if(cur>=0)renderSugg()};
+  B.appendChild(kr);
+}
 function renderEdit(){
   const B=$("catEdit");B.innerHTML="";
   cats.forEach((c,i)=>{
@@ -800,9 +829,9 @@ function renderEdit(){
     row.querySelector('[data-a=del]').onclick=()=>{
       if(!confirm("حذف هذا الزر؟ ستُزال علامته من كل الصور.")){return}
       files.forEach(f=>f.cats.delete(c.id));cats.splice(i,1);saveCats();persist();renderEdit()};
-    B.appendChild(row);
+    B.appendChild(row);renderEditKw(B,c);
   });
-  const m=document.createElement("div");m.className="msg";m.textContent="انقر المربع الملون لتغيير اللون. الأزرار التسعة الأولى لها اختصار من لوحة المفاتيح.";B.appendChild(m);
+  const m=document.createElement("div");m.className="msg";m.textContent="السطر تحت كل زر فيه الكلمات التي يبحث عنها التطبيق في نص الملف لاقتراح الزر. انقر المربع الملون لتغيير اللون. الأزرار التسعة الأولى لها اختصار من لوحة المفاتيح.";B.appendChild(m);
 }
 function saveCats(){lsSet(LS+".cats",cats);renderCats();refreshAll();if(root)makeCatDirs()}
 $("btnManage").onclick=()=>{renderEdit();open("mCat")};
@@ -1027,6 +1056,141 @@ CR.addEventListener("pointermove",e=>{
   cr={x:L,y:T,w:R-L,h:B-T};drawCr();
 });
 CR.addEventListener("pointerup",()=>cd=null);
+
+/* ============ الاقتراح من محتوى الملف ============ */
+const DEFAULT_KW={
+ "دورات تدريبية":"دورة، دورة تدريبية، دورة تطويرية، تدريبية، اجتياز الدورة، المتدرب، training course, course completion",
+ "مؤتمرات وندوات":"مؤتمر، المؤتمر، ندوة، الندوة، ملتقى، مؤتمر علمي، conference, symposium, seminar",
+ "ورش عمل":"ورشة، ورشة عمل، ورشة تدريبية، workshop",
+ "إشراف على طلبة":"إشراف، المشرف، رسالة ماجستير، أطروحة دكتوراه، بحث تخرج، الطالب، الطلبة، supervision, thesis",
+ "لجان":"لجنة، اللجنة، لجان، عضو لجنة، تشكيل لجنة، أمر إداري، لجنة مناقشة، committee",
+ "كتب شكر وتقدير":"شكر وتقدير، كتاب شكر، نشكر، شكر، تقدير جهودكم، نثمن جهودكم، تثمين، appreciation, thanks",
+ "شهادات مشاركة":"شهادة مشاركة، شهادة، تشهد، منحت، شارك، participation, certificate",
+ "بحوث منشورة":"بحث منشور، مجلة، مستخلص، الكلمات المفتاحية، نشر، journal, abstract, doi, issn, scopus, keywords",
+ "مناصب إدارية":"رئيس قسم، معاون عميد، عميد، مقرر القسم، تكليف، منصب، أمر ديواني، رئاسة قسم",
+ "تدريس ومقررات":"مقرر، المقرر، محاضرات، تدريس، جدول دراسي، منهج، مفردات، syllabus"
+};
+const kwFor=c=>c.kw!=null?c.kw:(DEFAULT_KW[c.name]||"");
+function norm(t){
+  return String(t||"").normalize("NFKC").toLowerCase()
+    .replace(/[\u064B-\u065F\u0670\u0640]/g,"").replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه")
+    .replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
+}
+function countIn(h,n){let c=0,i=0;while(c<6&&(i=h.indexOf(n,i))>=0){c++;i+=n.length}return c}
+function suggestFor(f){
+  if(f.text==null)return null;
+  const N=" "+norm((f.name.replace(/\.[^.]+$/,"")+" ")+" "+(f.text||""))+" ",head=N.slice(0,500);
+  const res=cats.map(c=>{
+    const kws=new Set(kwFor(c).split(/[،,\n]/).map(norm).filter(x=>x.length>=2));
+    const nm=norm(c.name);if(nm.length>=3)kws.add(nm);
+    let sc=0,hits=[];
+    kws.forEach(k=>{
+      const n=countIn(N,k);if(!n)return;
+      const w=k.includes(" ")?2.5:1.2;sc+=w*Math.min(n,3)+(head.includes(k)?w:0);hits.push(k);
+    });
+    return{id:c.id,score:sc,hits};
+  }).filter(r=>r.score>=1.8).sort((a,b)=>b.score-a.score);
+  if(!res.length)return null;
+  const tot=res.slice(0,3).reduce((a,r)=>a+r.score,0)+1;
+  return res.slice(0,2).map(r=>({...r,pct:Math.min(97,Math.round(r.score/tot*100))}));
+}
+/* القراءة الضوئية */
+const OCR={w:null,loading:null,stat:"",failed:null};
+async function ocrWorker(){
+  if(OCR.w)return OCR.w;if(OCR.loading)return OCR.loading;
+  const C=window.OCR_CFG||{};
+  OCR.loading=(async()=>{
+    OCR.stat="جارٍ تجهيز القراءة الضوئية (مرة واحدة، تحتاج إنترنت)…";renderSugg();
+    if(!window.Tesseract){
+      await new Promise((res,rej)=>{const sc=document.createElement("script");
+        sc.src=C.script||"https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+        sc.onload=res;sc.onerror=()=>rej(new Error("تعذر تحميل مكتبة القراءة الضوئية. تأكد من الإنترنت."));document.head.appendChild(sc)});
+    }
+    OCR.w=await Tesseract.createWorker(C.langs||["ara","eng"],1,C.opts||{});
+    OCR.stat="";return OCR.w;
+  })().catch(e=>{OCR.loading=null;throw e});
+  return OCR.loading;
+}
+async function ocrSource(src){
+  const w=await ocrWorker();OCR.stat="جارٍ قراءة النص من الصورة…";renderSugg();
+  const {data}=await w.recognize(src);OCR.stat="";return data.text||"";
+}
+async function bmpToCanvas(bmp,max){
+  const k=Math.min(1,max/Math.max(bmp.width,bmp.height)),c=document.createElement("canvas");
+  c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);
+  const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(bmp,0,0,c.width,c.height);return c;
+}
+let ocrChain=Promise.resolve();
+function inOcrQueue(f,job){ // يتخطى الملف إن لم يعد معروضًا
+  const p=ocrChain.then(()=>{if(files[cur]!==f)return null;return job()});
+  ocrChain=p.catch(()=>{});return p;
+}
+async function extractText(f){
+  let t="";
+  if(f.kind==="text")t=await f.file.text();
+  else if(f.kind==="docx"){
+    const z=await JSZip.loadAsync(f.file),x=await z.file("word/document.xml").async("string");
+    t=x.replace(/<\/w:p>/g,"\n").replace(/<w:tab\/>/g," ").replace(/<[^>]+>/g,"")
+      .replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,"&");
+  }else if(f.kind==="pdf"){
+    const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.file.arrayBuffer())}).promise;
+    for(let n=1;n<=Math.min(3,pdf.numPages);n++){
+      const pg=await pdf.getPage(n),tc=await pg.getTextContent();t+=tc.items.map(i=>i.str).join(" ")+"\n";
+    }
+    if(t.replace(/\s/g,"").length<40&&$("optOcr").checked){
+      const r=await inOcrQueue(f,async()=>{
+        const pg=await pdf.getPage(1),v0=pg.getViewport({scale:1}),vp=pg.getViewport({scale:Math.min(3,1800/v0.width)});
+        const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;
+        await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;return ocrSource(c)});
+      if(r===null){pdf.destroy();return null}t+=r;
+    }
+    pdf.destroy();
+  }else if(f.kind==="img"){
+    const r=await inOcrQueue(f,async()=>{
+      const bmp=await createImageBitmap(f.file);const c=await bmpToCanvas(bmp,1900);bmp.close&&bmp.close();return ocrSource(c)});
+    if(r===null)return null;t=r;
+  }
+  return t.slice(0,30000);
+}
+async function analyze(f){
+  if(f.text!=null||f.analyzing)return;
+  if(f.kind==="img"&&!$("optOcr").checked){renderSugg();return}
+  f.analyzing=true;f.err=null;renderSugg();
+  try{
+    const t=await extractText(f);
+    if(t===null){f.analyzing=false;return}   // تخطّي: لم يعد معروضًا
+    f.text=t;
+  }catch(e){f.err=e.message||String(e);if(f.kind==="img"||f.kind==="pdf")OCR.failed=f.err}
+  f.analyzing=false;renderSugg();
+  if(f.text!=null)autoApply(f);
+}
+function autoApply(f){
+  if(!$("optAutoSug").checked||f!==files[cur]||f.cats.size||f.autoDone)return;
+  const r=suggestFor(f);if(r&&r[0].pct>=70&&r[0].score>=4){f.autoDone=true;toggle(r[0].id,true);toast(`طُبّق الاقتراح: ${catOf(r[0].id).name}`)}
+}
+function renderSugg(){
+  const el=$("sugg");document.querySelectorAll(".cat.sg").forEach(b=>b.classList.remove("sg"));
+  if(cur<0){el.innerHTML="";return}
+  const f=files[cur];
+  if(f.analyzing){el.innerHTML='<span class="sgx">⏳ '+esc(f.kind!=="docx"&&f.kind!=="text"&&OCR.stat?OCR.stat:"جارٍ قراءة المحتوى…")+'</span>';return}
+  if(f.err){el.innerHTML='<span class="sgx" title="'+esc(f.err)+'">⚠ تعذرت قراءة المحتوى</span> <button class="sbtn" id="btnRetry">إعادة المحاولة</button>';
+    $("btnRetry").onclick=()=>{f.err=null;f.text=null;analyze(f)};return}
+  if(f.text==null){
+    if(f.kind==="img"&&!$("optOcr").checked){el.innerHTML='<button class="sbtn" id="btnRead">🔍 اقرأ النص واقترح</button>';
+      $("btnRead").onclick=()=>{$("optOcr").checked=true;saveOpts();analyze(f)}}
+    else el.innerHTML="";return}
+  const r=suggestFor(f);
+  let h="";
+  if(!r)h='<span class="sgx">💡 لا يوجد اقتراح واضح</span>';
+  else{
+    h='<span class="sgx">💡 اقتراح:</span>'+r.map(x=>`<button class="sugchip" data-id="${x.id}" style="--col:${catOf(x.id).color}" title="كلمات وُجدت: ${esc(x.hits.slice(0,6).join("، "))}">${esc(catOf(x.id).name)} · ${x.pct}%</button>`).join("");
+    const top=document.querySelector(`.cat[data-id="${r[0].id}"]`);top&&top.classList.add("sg");
+  }
+  h+=' <button class="sbtn" id="btnTxt" title="عرض النص الذي قرأه التطبيق">📄 النص</button>';
+  el.innerHTML=h;
+  el.querySelectorAll(".sugchip").forEach(b=>b.onclick=()=>toggle(b.dataset.id,true));
+  $("btnTxt").onclick=()=>{$("txtInfo").textContent=`${f.name} — ${(f.text||"").trim().length} حرفًا`;$("txtBody").textContent=(f.text||"").trim()||"لم يُستخرج نص من هذا الملف.";open("mTxt")};
+}
 
 /* ============ الربط بمجلد الحاسوب ============ */
 const ROOT_NAME="DOCS";

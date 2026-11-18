@@ -90,27 +90,38 @@ header{display:flex;align-items:center;gap:14px;padding:10px 18px;background:var
 .hbtn.pri:hover{filter:brightness(1.1)}
 .hbtn:disabled{opacity:.4;cursor:not-allowed}
 /* main */
-main{display:grid;grid-template-columns:300px 1fr 150px;min-height:0}
+main{display:grid;grid-template-columns:1fr 150px;min-height:0}
 aside{background:var(--panel);min-height:0;display:flex;flex-direction:column}
-#cats{border-inline-end:1px solid var(--line)}
 #thumbs{border-inline-start:1px solid var(--line)}
 .side-h{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);font-weight:700}
 .side-h small{color:var(--mut);font-weight:400;font-size:12px}
 .link{background:none;color:var(--acc);font-size:13px;padding:2px 6px}
-#catList{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
-.cat{position:relative;display:flex;align-items:center;gap:10px;padding:12px 12px;border-radius:12px;background:var(--panel2);border:2px solid transparent;text-align:start;transition:.12s;width:100%}
-.cat:hover{background:#243546}
-.cat .k{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:13px;font-weight:700;background:#0003;color:var(--mut);flex:none}
-.cat .n{flex:1;font-weight:600;line-height:1.3}
-.cat .c{font-size:12px;background:#0004;border-radius:99px;padding:2px 9px;color:var(--mut);flex:none}
-.cat.on{border-color:var(--col);background:color-mix(in srgb,var(--col) 22%,var(--panel2))}
-.cat.on .k{background:var(--col);color:#000}
-.cat.on::after{content:"✓";position:absolute;inset-inline-start:-6px;top:-6px;width:20px;height:20px;border-radius:50%;background:var(--col);color:#000;display:grid;place-items:center;font-size:12px;font-weight:900}
-.cat .dot{width:6px;align-self:stretch;border-radius:4px;background:var(--col);flex:none}
+.cat{position:relative;display:flex;align-items:center;gap:8px;padding:6px 10px;min-height:38px;border-radius:10px;background:var(--panel2);border:1.5px solid var(--line);border-inline-start:5px solid var(--col);text-align:start;transition:.12s;min-width:0;font-size:13.5px}
+.cat:hover{background:#2a3d50;border-color:var(--col)}
+.cat .k{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;font-size:11.5px;font-weight:700;background:#0004;color:var(--mut);flex:none}
+.cat .n{flex:1;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.cat .c{font-size:11px;background:#0004;border-radius:99px;padding:1px 8px;color:var(--mut);flex:none}
+.cat.on{background:var(--col);color:#04211c;border-color:#fff9;box-shadow:0 0 0 2px var(--col),0 4px 16px #0006;transform:scale(1.03)}
+.cat.on .k,.cat.on .c{background:#0003;color:#04211c}
+.cat.on::after{content:"✓";font-weight:900;flex:none}
+.cat .dot{display:none}
+#viewerWrap{display:grid;grid-template-columns:205px 1fr 205px;grid-template-rows:auto 1fr auto auto auto;grid-template-areas:"top top top" "right stage left" "bottom bottom bottom" "bar bar bar" "opt opt opt"}
+#catTop{grid-area:top}#catRight{grid-area:right}#catLeft{grid-area:left}#catBottom{grid-area:bottom}
+#stage{grid-area:stage}#stateBar{grid-area:bar}#optBar{grid-area:opt}
+.cside{background:var(--panel);display:flex;gap:7px;padding:8px 10px;justify-content:center;flex-wrap:wrap;min-width:0}
+.cside:empty{display:none}
+.cside .cat{flex:1 1 0;max-width:230px}
+#catTop{border-bottom:1px solid var(--line)}#catBottom{border-top:1px solid var(--line)}
+.cside.v{flex-direction:column;flex-wrap:nowrap;justify-content:space-evenly;align-items:stretch;overflow:auto}
+.cside.v .cat{flex:0 0 auto;max-width:none}
+.cside.v .cat .n{white-space:normal}
+#catRight{border-inline-start:none;border-left:0}
+#optBar{background:var(--panel);border-top:1px solid var(--line);padding:6px 14px;display:flex;gap:18px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--mut)}
+#optBar label{display:flex;gap:6px;align-items:center;cursor:pointer}
 .opts{padding:10px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--mut)}
 .opts label{display:flex;gap:8px;align-items:center;cursor:pointer}
 /* viewer */
-#viewerWrap{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+#viewerWrap{min-width:0;min-height:0;position:relative}
 #stage{flex:1;position:relative;overflow:hidden;background:
   repeating-conic-gradient(#121b25 0 25%,#0f1720 0 50%) 0 0/24px 24px;cursor:grab;touch-action:none}
 #stage.drag{cursor:grabbing}
@@ -189,9 +200,10 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
 .help{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
 .help kbd{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:1px 9px;font-family:inherit;text-align:center}
 @media (max-width:1000px){
-  main{grid-template-columns:1fr;grid-template-rows:auto 1fr 110px}
-  #cats{order:1;border:none;border-bottom:1px solid var(--line);max-height:34vh}
-  #viewerWrap{order:2}#thumbs{order:3;border:none;border-top:1px solid var(--line)}
+  main{grid-template-columns:1fr;grid-template-rows:1fr 110px;overflow:auto}
+  #viewerWrap{grid-template-columns:1fr;grid-template-areas:'top' 'right' 'left' 'stage' 'bottom' 'bar' 'opt';grid-template-rows:auto auto auto minmax(300px,1fr) auto auto auto}
+  .cside.v{flex-direction:row;flex-wrap:wrap}.cside.v .cat{flex:1 1 140px}
+  #thumbs{border:none;border-top:1px solid var(--line)}
   #thList{flex-direction:row}.th{width:80px;aspect-ratio:3/4;height:100%}
   .prog{display:none}
 }
@@ -225,18 +237,12 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
 </header>
 
 <main>
-  <!-- الأزرار -->
-  <aside id="cats">
-    <div class="side-h"><span>جوانب التقييم <small id="catHint"></small></span><button class="link" id="btnManage">✏️ تعديل الأزرار</button></div>
-    <div id="catList"></div>
-    <div class="opts">
-      <label><input type="checkbox" id="optAuto"> الانتقال للصورة التالية بعد كل نقرة</label>
-      <label><input type="checkbox" id="optMulti" checked> السماح بأكثر من جانب للصورة الواحدة</label>
-    </div>
-  </aside>
-
   <!-- العارض -->
   <section id="viewerWrap">
+    <div class="cside" id="catTop"></div>
+    <div class="cside v" id="catRight"></div>
+    <div class="cside v" id="catLeft"></div>
+    <div class="cside" id="catBottom"></div>
     <div id="stage">
       <img id="img" alt="" draggable="false" hidden>
       <div id="docView" hidden></div>
@@ -278,6 +284,12 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
       <button class="sbtn" id="btnOrig">↩ الأصل</button>
       <button class="sbtn" id="btnClear">إزالة التصنيف</button>
       <button class="sbtn d" id="btnRemove">حذف من القائمة</button>
+    </div>
+    <div id="optBar">
+      <button class="link" id="btnManage">✏️ تعديل الأزرار</button>
+      <label><input type="checkbox" id="optAuto"> الانتقال للتالي بعد كل نقرة</label>
+      <label><input type="checkbox" id="optMulti" checked> أكثر من جانب للملف الواحد</label>
+      <small id="catHint"></small>
     </div>
   </section>
 
@@ -590,14 +602,18 @@ $("prev").onclick=()=>go(cur-1);$("next").onclick=()=>go(cur+1);
 
 /* ============ الأزرار ============ */
 function renderCats(){
-  const L=$("catList");L.innerHTML="";
+  const sides=["catTop","catRight","catBottom","catLeft"].map($);sides.forEach(x=>x.innerHTML="");
+  const n=cats.length,base=Math.floor(n/4),ex=n%4,cnt=[0,1,2,3].map(i=>base+(i<ex?1:0));
+  // ترتيب الاستحقاق للزيادة: أعلى، يمين، أسفل، يسار
+  let idx=0;
   cats.forEach((c,i)=>{
-    const b=document.createElement("button");b.className="cat";b.style.setProperty("--col",c.color);b.dataset.id=c.id;
-    b.innerHTML=`<span class="dot"></span><span class="n"></span><span class="c">0</span><span class="k">${i<9?i+1:""}</span>`;
-    b.querySelector(".n").textContent=c.name;
-    b.onclick=()=>toggle(c.id);L.appendChild(b);
+    while(cnt[idx]===0)idx++;
+    const b=document.createElement("button");b.className="cat";b.style.setProperty("--col",c.color);b.dataset.id=c.id;b.title=c.name;
+    b.innerHTML=`<span class="k">${i<9?i+1:""}</span><span class="n"></span><span class="c">0</span>`;
+    b.querySelector(".n").textContent=c.name;b.onclick=()=>toggle(c.id);
+    sides[idx].appendChild(b);cnt[idx]--;
   });
-  $("catHint").textContent="(1–9 من لوحة المفاتيح)";
+  $("catHint").textContent="المفاتيح 1–9 تفعّل الأزرار";
 }
 function toggle(id,force){
   if(cur<0){toast("أضف صورًا أولًا");return}

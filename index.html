@@ -970,7 +970,7 @@ CR.addEventListener("pointermove",e=>{
 CR.addEventListener("pointerup",()=>cd=null);
 
 /* ============ الربط بمجلد الحاسوب ============ */
-const ROOT_NAME="MY_DOCS";
+const ROOT_NAME="DOCS";
 let root=null,parentName="",pending=null;
 function idbDo(mode,fn){return new Promise((res,rej)=>{
   const r=indexedDB.open("fariz",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");
@@ -1048,16 +1048,17 @@ function linkModal(){
     const c=document.createElement("button");c.className="hbtn";c.textContent="⛔ فك الربط";c.onclick=async()=>{root=null;pending=null;await idbDel();linkUI();closeAll();toast("تم فك الربط")};
     F.append(a,b,c);
   }else{
-    B.innerHTML=`<div class="msg" style="font-size:15px;color:var(--txt)">اختر مجلدًا على حاسوبك مرة واحدة، مثل المستندات أو سطح المكتب.</div>
-    <div class="msg">سينشئ التطبيق داخله مجلدًا باسم:<br><bdi dir="ltr" style="color:var(--txt);font-weight:700">${ROOT_NAME}</bdi><br>وبداخله مجلد لكل زر تصنيف.<br>بعدها يُحفظ كل ملف تصنفه في مجلده مباشرة.<br>الميزة تعمل في متصفحي كروم وإيدج.</div>`;
-    const a=document.createElement("button");a.className="hbtn pri";a.textContent="📂 اختيار المجلد";a.onclick=()=>{closeAll();pickDir()};F.append(a);
+    B.innerHTML=`<div class="msg" style="font-size:15px;color:var(--txt)">اسمح للتطبيق بإنشاء مجلد على سطح المكتب باسم:<br><bdi dir="ltr" style="font-weight:800;color:var(--acc2)">${ROOT_NAME}</bdi></div>
+    <div class="msg">بداخله مجلد لكل زر تصنيف. وكل ملف تصنفه يُحفظ فيه مباشرة.<br><br>الخطوات:<br>١. انقر زر «اختيار سطح المكتب» أدناه.<br>٢. ستفتح نافذة على سطح المكتب. انقر الزر:<br><bdi dir="ltr" style="color:var(--txt);font-weight:700">Select Folder</bdi><br>٣. ستظهر رسالة طلب إذن. انقر الزر:<br><bdi dir="ltr" style="color:var(--txt);font-weight:700">Edit files</bdi><br><br>تُطلب هذه الموافقة مرة واحدة فقط.<br>الميزة تعمل في متصفحي كروم وإيدج.</div>`;
+    const a=document.createElement("button");a.className="hbtn pri";a.textContent="🖥️ اختيار سطح المكتب";a.onclick=()=>{closeAll();pickDir()};
+    const n=document.createElement("button");n.className="hbtn";n.textContent="ليس الآن";n.onclick=closeAll;F.append(a,n);
   }
   open("mLink");
 }
 async function pickDir(){
   if(!window.showDirectoryPicker){toast("هذه الميزة تحتاج متصفح كروم أو إيدج",3500);return}
   try{
-    const h=await showDirectoryPicker({id:"fariz",mode:"readwrite",startIn:"documents"});
+    const h=await showDirectoryPicker({id:"fariz",mode:"readwrite",startIn:"desktop"});
     await connect(h);await idbPut(h);
     toast("تم الربط. أُنشئ المجلد الرئيسي ومجلدات الأزرار",3500);
     if(files.some(f=>f.cats.size))linkModalAsk();
@@ -1073,7 +1074,7 @@ $("btnLink").onclick=async()=>{
   linkModal();
 };
 (async()=>{
-  const h=await idbGet();if(!h)return;
+  const h=await idbGet();if(!h){if(window.showDirectoryPicker)setTimeout(()=>{if(!root&&!pending)linkModal()},700);return}
   try{
     pending=h;
     if(await h.queryPermission({mode:"readwrite"})==="granted")await connect(h);

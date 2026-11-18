@@ -824,7 +824,7 @@ function renderLoc(){
   const B=$("saveLoc");if(!B)return;
   if(cur<0||!root){B.innerHTML="";return}
   const f=files[cur],ids=[...f.cats].filter(id=>f.synced&&f.synced[id]);
-  B.innerHTML=ids.map(id=>`<div class="sl">📁 <span>حُفظ في:</span> <bdi>${esc(locPath(id,f.synced[id]))}</bdi><button data-p="${esc(locPath(id,f.synced[id]))}">نسخ المسار</button></div>`).join("");
+  B.innerHTML=ids.map(id=>`<div class="sl">📁 <span>حُفظ في:</span> <bdi dir="ltr">${esc(locPath(id,f.synced[id]))}</bdi><button data-p="${esc(locPath(id,f.synced[id]))}">نسخ المسار</button></div>`).join("");
   B.querySelectorAll("button").forEach(b=>b.onclick=()=>{try{navigator.clipboard.writeText(b.dataset.p);toast("نُسخ المسار")}catch(e){toast("تعذر النسخ")}});
 }
 const esc=s=>String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));

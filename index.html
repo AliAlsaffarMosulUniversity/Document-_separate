@@ -369,7 +369,6 @@ body,header,aside,.cside,.card,.hbtn,.cat,#stateBar,#optBar{transition:backgroun
       <span id="pos"></span>
       <span id="fname"></span>
       <div id="chips"></div>
-      <div id="saveLoc"></div>
       <span id="sugg"></span>
       <button class="sbtn" id="btnSave" title="حفظ التدوير والقص في الصورة">💾 حفظ التعديل</button>
       <button class="sbtn" id="btnOne">⬇ تحميل هذه الصورة</button>
@@ -746,12 +745,20 @@ function renderCats(){
   let idx=0;
   cats.forEach((c,i)=>{
     while(cnt[idx]===0)idx++;
-    const b=document.createElement("button");b.className="cat";b.style.setProperty("--col",c.color);b.dataset.id=c.id;b.title=c.name;
+    const b=document.createElement("button");b.className="cat";b.style.setProperty("--col",c.color);b.dataset.id=c.id;b.title=c.name+" — Ctrl+نقرة لفتح مجلده";
     b.innerHTML=`<span class="k">${i<9?i+1:""}</span><span class="n"></span><span class="c">0</span>`;
-    b.querySelector(".n").textContent=c.name;b.onclick=()=>toggle(c.id);
+    b.querySelector(".n").textContent=c.name;b.onclick=e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();openCatFolder(c.id);return}toggle(c.id)};
     sides[idx].appendChild(b);cnt[idx]--;
   });
   $("catHint").textContent="المفاتيح 1–9 تفعّل الأزرار";
+}
+async function openCatFolder(id){
+  if(!root){toast("اربط التطبيق بمجلد الحاسوب أولًا (زر الربط)",3000);return}
+  try{
+    const dir=await root.getDirectoryHandle(safe(catOf(id).name),{create:true});
+    toast(`فتح مجلد «${catOf(id).name}» (يمكنك إغلاق النافذة بزر إلغاء)`,3500);
+    await window.showOpenFilePicker({startIn:dir,multiple:false});
+  }catch(e){if(e&&e.name!=="AbortError")toast("تعذر فتح المجلد: "+(e.message||e.name),3500)}
 }
 function toggle(id,force){
   if(cur<0){toast("أضف ملفات أولًا");return}
@@ -818,7 +825,7 @@ function refreshAll(){
   $("thCount").textContent=n?n+" صورة":"";
   $("btnDl").disabled=!done;
   files.forEach((_,i)=>refreshThumb(i));
-  renderSugg();renderDup();renderLoc();
+  renderSugg();renderDup();
 }
 const locPath=(catId,n)=>[parentName,ROOT_NAME,safe(catOf(catId).name),n].filter(Boolean).join(" \\ ");
 function renderLoc(){
@@ -1377,8 +1384,7 @@ async function syncOne(f,catId,say){
     }
     const fh=await dir.getFileHandle(n,{create:true}),w=await fh.createWritable();
     await w.write(blob);await w.close();f.synced[catId]=n;
-    say&&toast(`✓ حُفظ في: \u2066${locPath(catId,n)}\u2069`,4500);
-    renderLoc();
+    say&&toast(`✓ حُفظ في مجلد «${c.name}»`);
     return true;
   }catch(e){lost(e);if(say)toast("تعذر الحفظ المباشر: "+(e.message||e.name),3500);return false}
 }

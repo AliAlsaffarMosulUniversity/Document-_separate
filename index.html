@@ -116,6 +116,13 @@ aside{background:var(--panel);min-height:0;display:flex;flex-direction:column}
 .cside.v .cat{flex:0 0 auto;max-width:none}
 .cside.v .cat .n{white-space:normal}
 #catRight{border-inline-start:none;border-left:0}
+.gold{position:relative;overflow:hidden;padding:7px 14px;border-radius:10px;font-weight:800;font-size:13px;color:#3a2600;
+  background:linear-gradient(135deg,#fff3b0 0%,#ffd84a 22%,#f0a800 52%,#ffe27a 78%,#d89200 100%);
+  border:1px solid #fff0a0;box-shadow:0 0 0 1px #8a5a00 inset,0 3px 14px #f0b42966,0 0 18px #ffd84a55;text-shadow:0 1px 0 #fff8;transition:.15s}
+.gold::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,#fffc,transparent);transform:skewX(-20deg);animation:shine 3.2s infinite}
+@keyframes shine{0%{left:-60%}55%,100%{left:130%}}
+.gold:hover{filter:brightness(1.08) saturate(1.1);transform:translateY(-1px);box-shadow:0 0 0 1px #8a5a00 inset,0 5px 20px #f0b429aa,0 0 26px #ffd84a88}
+.gold:active{transform:translateY(0)}
 #optBar{background:var(--panel);border-top:1px solid var(--line);padding:6px 14px;display:flex;gap:18px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--mut)}
 #optBar label{display:flex;gap:6px;align-items:center;cursor:pointer}
 .opts{padding:10px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--mut)}
@@ -283,7 +290,8 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
       <button class="sbtn" id="btnOne">⬇ تحميل هذه الصورة</button>
       <button class="sbtn" id="btnOrig">↩ الأصل</button>
       <button class="sbtn" id="btnClear">إزالة التصنيف</button>
-      <button class="sbtn d" id="btnRemove">حذف من القائمة</button>
+      <button class="gold" id="btnRemove" title="حذف الملف الحالي من القائمة">🗑 حذف الملف الحالي</button>
+      <button class="gold" id="btnRemoveAll" title="حذف جميع الملفات المدرجة">🗑 حذف الكل</button>
     </div>
     <div id="optBar">
       <button class="link" id="btnManage">✏️ تعديل الأزرار</button>
@@ -323,6 +331,11 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
 </div></div>
 
 <!-- نافذة إدارة الأزرار -->
+<div class="modal" id="mDel"><div class="card" style="width:min(460px,100%)">
+  <h3>حذف جميع الملفات <button class="x" data-close>✕</button></h3>
+  <div class="bd"><div class="msg" id="delAllTxt" style="font-size:15px;color:var(--txt)"></div></div>
+  <div class="ft"><button class="gold" id="delAllOk">🗑 نعم، احذف الكل</button><button class="hbtn" data-close>إلغاء</button></div>
+</div></div>
 <div class="modal" id="mCat"><div class="card">
   <h3>تعديل أزرار التقييم <button class="x" data-close>✕</button></h3>
   <div class="bd" id="catEdit"></div>
@@ -485,7 +498,7 @@ const catOf=id=>cats.find(c=>c.id===id)||{color:"#777",name:"؟"};
 let sc=1,tx=0,ty=0,iw=0,ih=0,rot=0,fitMode="fit",curUrl=null;
 function show(i){
   if(i<0||i>=files.length){
-    cur=-1;IMG.hidden=true;$("empty").hidden=false;
+    cur=-1;tok++;IMG.hidden=true;$("docView").hidden=true;$("docView").innerHTML="";$("empty").hidden=false;
     ["prev","next","tools","stateBar"].forEach(x=>$(x).hidden=true);return;
   }
   cur=i;const f=files[i];
@@ -624,10 +637,33 @@ function toggle(id,force){
   if($("optAuto").checked&&f.cats.size&&cur<files.length-1)setTimeout(()=>go(cur+1),160);
 }
 $("btnClear").onclick=()=>{if(cur<0)return;files[cur].cats.clear();persist();refreshAll()};
+function dropFiles(list){
+  list.forEach(f=>{
+    delete saved[f.key];
+    if(f.thumb){try{URL.revokeObjectURL(f.thumb)}catch(e){}}
+  });
+  lsSet(LS+".assign",saved);
+}
+function afterRemove(i){
+  if(cropOn)endCrop();
+  buildThumbs();
+  show(files.length?Math.min(i,files.length-1):-1);
+  refreshAll();
+}
 $("btnRemove").onclick=()=>{
-  if(cur<0)return;const i=cur,f=files[i];
-  if(f.thumb)URL.revokeObjectURL(f.thumb);
-  files.splice(i,1);persist();buildThumbs();show(Math.min(i,files.length-1));refreshAll();
+  if(cur<0){toast("لا يوجد ملف لحذفه");return}
+  const i=cur,f=files[i];
+  files.splice(i,1);dropFiles([f]);afterRemove(i);
+  toast(files.length?`تم حذف الملف. المتبقي ${files.length}`:"تم حذف الملف. القائمة فارغة الآن");
+};
+$("btnRemoveAll").onclick=()=>{
+  if(!files.length){toast("القائمة فارغة");return}
+  $("delAllTxt").textContent=`سيتم حذف ${files.length} ملف من القائمة مع تصنيفاتها. الملفات الأصلية على جهازك لا تتأثر.`;
+  open("mDel");
+};
+$("delAllOk").onclick=()=>{
+  const n=files.length,all=files.splice(0,files.length);dropFiles(all);
+  closeAll();afterRemove(0);toast(`تم حذف ${n} ملف`);
 };
 function refreshAll(){
   // أزرار

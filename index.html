@@ -970,7 +970,7 @@ CR.addEventListener("pointermove",e=>{
 CR.addEventListener("pointerup",()=>cd=null);
 
 /* ============ الربط بمجلد الحاسوب ============ */
-const ROOT_NAME="فارز الوثائق";
+const ROOT_NAME="MY_DOCS";
 let root=null,parentName="",pending=null;
 function idbDo(mode,fn){return new Promise((res,rej)=>{
   const r=indexedDB.open("fariz",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");
@@ -990,7 +990,7 @@ async function connect(handle){
 }
 function linkUI(){
   const b=$("btnLink");
-  if(root){b.textContent="✅ مرتبط بالحاسوب";b.style.borderColor="var(--acc)";$("linkStat").textContent=`الحفظ المباشر إلى: ${parentName?parentName+" ◂ ":""}${ROOT_NAME}`;$("linkStat").style.color="var(--acc)"}
+  if(root){b.textContent="✅ مرتبط بالحاسوب";b.style.borderColor="var(--acc)";$("linkStat").textContent=`الحفظ المباشر إلى: \u2066${parentName?parentName+" / ":""}${ROOT_NAME}\u2069`;$("linkStat").style.color="var(--acc)"}
   else if(pending){b.textContent="🔗 إعادة تفعيل الربط";b.style.borderColor="var(--acc2)";$("linkStat").textContent="الربط محفوظ. انقر «إعادة تفعيل الربط» لمتابعة الحفظ المباشر.";$("linkStat").style.color="var(--acc2)"}
   else{b.textContent="🔗 ربط بمجلد الحاسوب";b.style.borderColor="";$("linkStat").textContent="";}
 }
@@ -1042,14 +1042,14 @@ function linkModal(){
   const B=$("linkBody"),F=$("linkFt");F.innerHTML="";
   if(root){
     B.innerHTML=`<div class="msg" style="font-size:15px;color:var(--txt)">الربط فعّال. كل ملف تضغط له زر جانب يُنسخ فورًا إلى مجلده في حاسوبك.</div>
-    <div class="msg">المسار: ${esc(parentName?parentName+" ◂ ":"")}${ROOT_NAME} ◂ (مجلد لكل زر)<br>إلغاء تفعيل الزر يزيل النسخة من مجلده.<br>حذف الملف من قائمة التطبيق لا يحذف النسخة المحفوظة في الحاسوب.</div>`;
+    <div class="msg">المسار:<br><bdi dir="ltr" style="color:var(--txt);font-weight:700">${esc(parentName?parentName+" / ":"")}${ROOT_NAME}</bdi><br>إلغاء تفعيل الزر يزيل النسخة من مجلده.<br>حذف الملف من قائمة التطبيق لا يحذف النسخة المحفوظة في الحاسوب.</div>`;
     const a=document.createElement("button");a.className="hbtn pri";a.textContent="🔄 مزامنة كل الملفات المصنفة الآن";a.onclick=()=>{closeAll();syncAll()};
     const b=document.createElement("button");b.className="hbtn";b.textContent="📂 تغيير المجلد";b.onclick=()=>{closeAll();pickDir()};
     const c=document.createElement("button");c.className="hbtn";c.textContent="⛔ فك الربط";c.onclick=async()=>{root=null;pending=null;await idbDel();linkUI();closeAll();toast("تم فك الربط")};
     F.append(a,b,c);
   }else{
     B.innerHTML=`<div class="msg" style="font-size:15px;color:var(--txt)">اختر مجلدًا على حاسوبك مرة واحدة، مثل المستندات أو سطح المكتب.</div>
-    <div class="msg">سينشئ التطبيق داخله مجلدًا باسم «${ROOT_NAME}»، وبداخله مجلد لكل زر تصنيف.<br>بعدها يُحفظ كل ملف تصنفه في مجلده مباشرة.<br>الميزة تعمل في متصفحي كروم وإيدج.</div>`;
+    <div class="msg">سينشئ التطبيق داخله مجلدًا باسم:<br><bdi dir="ltr" style="color:var(--txt);font-weight:700">${ROOT_NAME}</bdi><br>وبداخله مجلد لكل زر تصنيف.<br>بعدها يُحفظ كل ملف تصنفه في مجلده مباشرة.<br>الميزة تعمل في متصفحي كروم وإيدج.</div>`;
     const a=document.createElement("button");a.className="hbtn pri";a.textContent="📂 اختيار المجلد";a.onclick=()=>{closeAll();pickDir()};F.append(a);
   }
   open("mLink");
@@ -1059,7 +1059,7 @@ async function pickDir(){
   try{
     const h=await showDirectoryPicker({id:"fariz",mode:"readwrite",startIn:"documents"});
     await connect(h);await idbPut(h);
-    toast(`تم الربط. أُنشئ المجلد «${ROOT_NAME}» ومجلدات الأزرار`,3500);
+    toast("تم الربط. أُنشئ المجلد الرئيسي ومجلدات الأزرار",3500);
     if(files.some(f=>f.cats.size))linkModalAsk();
   }catch(e){if(e.name!=="AbortError")toast("تعذر الربط: "+e.message,3500)}
 }

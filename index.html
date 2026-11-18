@@ -233,6 +233,11 @@ html .cside{border:0}
 html #catTop{border-bottom:2px solid var(--frame)}
 html #catBottom{border-top:2px solid var(--frame)}
 html #stateBar{border-top:2px solid var(--frame)}
+#saveLoc{flex-basis:100%;display:flex;flex-direction:column;gap:3px;font-size:12.5px}
+#saveLoc:empty{display:none}
+#saveLoc .sl{display:flex;align-items:center;gap:8px;background:rgba(47,182,160,.12);border:1px solid var(--acc);border-radius:8px;padding:4px 10px}
+#saveLoc bdi{direction:ltr;unicode-bidi:isolate;font-weight:700;color:var(--txt);user-select:all}
+#saveLoc button{margin-inline-start:auto;font:inherit;font-size:12px;border:1px solid var(--line);background:var(--panel);color:var(--txt);border-radius:6px;padding:2px 8px;cursor:pointer}
 html #optBar{border-top:2px solid var(--frame)}
 html #thumbs{border-inline-start:2px solid var(--frame)}
 html .side-h{border-bottom:2px solid var(--frame)}
@@ -363,6 +368,7 @@ body,header,aside,.cside,.card,.hbtn,.cat,#stateBar,#optBar{transition:backgroun
       <span id="pos"></span>
       <span id="fname"></span>
       <div id="chips"></div>
+      <div id="saveLoc"></div>
       <span id="sugg"></span>
       <button class="sbtn" id="btnSave" title="حفظ التدوير والقص في الصورة">💾 حفظ التعديل</button>
       <button class="sbtn" id="btnOne">⬇ تحميل هذه الصورة</button>
@@ -811,7 +817,15 @@ function refreshAll(){
   $("thCount").textContent=n?n+" صورة":"";
   $("btnDl").disabled=!done;
   files.forEach((_,i)=>refreshThumb(i));
-  renderSugg();renderDup();
+  renderSugg();renderDup();renderLoc();
+}
+const locPath=(catId,n)=>[parentName,ROOT_NAME,safe(catOf(catId).name),n].filter(Boolean).join(" \\ ");
+function renderLoc(){
+  const B=$("saveLoc");if(!B)return;
+  if(cur<0||!root){B.innerHTML="";return}
+  const f=files[cur],ids=[...f.cats].filter(id=>f.synced&&f.synced[id]);
+  B.innerHTML=ids.map(id=>`<div class="sl">📁 <span>حُفظ في:</span> <bdi>${esc(locPath(id,f.synced[id]))}</bdi><button data-p="${esc(locPath(id,f.synced[id]))}">نسخ المسار</button></div>`).join("");
+  B.querySelectorAll("button").forEach(b=>b.onclick=()=>{try{navigator.clipboard.writeText(b.dataset.p);toast("نُسخ المسار")}catch(e){toast("تعذر النسخ")}});
 }
 const esc=s=>String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 
@@ -1362,7 +1376,8 @@ async function syncOne(f,catId,say){
     }
     const fh=await dir.getFileHandle(n,{create:true}),w=await fh.createWritable();
     await w.write(blob);await w.close();f.synced[catId]=n;
-    say&&toast(`✓ حُفظ في مجلد «${c.name}»`);
+    say&&toast(`✓ حُفظ في: \u2066${locPath(catId,n)}\u2069`,4500);
+    renderLoc();
     return true;
   }catch(e){lost(e);if(say)toast("تعذر الحفظ المباشر: "+(e.message||e.name),3500);return false}
 }

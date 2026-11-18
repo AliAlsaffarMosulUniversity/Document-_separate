@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -227,12 +227,43 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
 .fcard h3{font-size:19px;margin-bottom:8px;direction:ltr;word-break:break-all}
 .fcard p{color:var(--mut);line-height:1.9}
 .hidden-io .io{display:none}
+/* مفتاح الوضع */
+.tsw{position:relative;display:inline-block;cursor:pointer;flex:none}
+.tsw input{position:absolute;opacity:0;width:0;height:0}
+.tr{display:flex;align-items:center;justify-content:space-between;width:70px;height:34px;padding:0 8px;border-radius:99px;background:linear-gradient(135deg,#8ed0ff,#ffe9a8);border:1.5px solid var(--line);position:relative;transition:background .3s;font-size:15px;box-shadow:inset 0 2px 6px #0002}
+.tr .ic{position:relative;z-index:1;line-height:1}
+.kn{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 6px #0005;transition:transform .3s}
+.tsw input:checked+.tr{background:linear-gradient(135deg,#1b2a4a,#3b3f7a)}
+.tsw input:checked+.tr .kn{transform:translateX(36px);background:#dfe8ff}
+.tsw input:focus-visible+.tr{outline:2px solid var(--acc);outline-offset:2px}
+/* الوضع النهاري */
+html[data-theme=light]{--bg:#edf1f6;--panel:#ffffff;--panel2:#f0f4f8;--line:#d5dee8;--txt:#16212c;--mut:#5b6e82;--acc:#10a08c;--acc2:#e0a100}
+html[data-theme=light] #stage{background:repeating-conic-gradient(#dde5ee 0 25%,#e8eef5 0 50%) 0 0/24px 24px}
+html[data-theme=light] #docView{background:#cdd7e2}
+html[data-theme=light] .hbtn:hover{background:#e3edf6}
+html[data-theme=light] .cat:hover{background:#e3edf6}
+html[data-theme=light] .cat .k,html[data-theme=light] .cat .c{background:#0000001a}
+html[data-theme=light] .cat.on .k,html[data-theme=light] .cat.on .c{background:#0000002e}
+html[data-theme=light] .tools,html[data-theme=light] #cropBar{background:#ffffffe6;box-shadow:0 4px 16px #0003}
+html[data-theme=light] .tools button:hover{background:#0001}
+html[data-theme=light] .nav{background:#ffffffd9;color:#16212c;box-shadow:0 3px 12px #0003}
+html[data-theme=light] .nav:hover{background:var(--acc);color:#fff}
+html[data-theme=light] #cropBar .msg{color:#16212c}
+html[data-theme=light] #empty .box{background:#ffffff99}
+html[data-theme=light] .hbtn.pri{color:#fff}
+html[data-theme=light] .modal{background:#0a1a2a88}
+html[data-theme=light] #img{box-shadow:0 10px 40px #0004}
+html[data-theme=light] .th .no{background:#000a;color:#fff}
+html[data-theme=light] header,html[data-theme=light] .cside,html[data-theme=light] #stateBar,html[data-theme=light] #optBar{box-shadow:0 1px 0 var(--line)}
+html[data-theme=light] .th img{opacity:1}
+body,header,aside,.cside,.card,.hbtn,.cat,#stateBar,#optBar{transition:background-color .25s,color .25s,border-color .25s}
 </style>
 </head>
 <body>
 <div id="app">
 <header>
   <div class="logo"><i>🗂️</i><span>فارز الوثائق</span></div>
+  <label class="tsw" dir="ltr" title="تبديل الوضع النهاري / الليلي"><input type="checkbox" id="themeSw" aria-label="الوضع الليلي"><span class="tr"><span class="ic">☀️</span><span class="ic">🌙</span><b class="kn"></b></span></label>
   <div class="prog">
     <div class="t"><span id="progTxt">لم تُضف ملفات بعد</span><span id="progPct"></span></div>
     <div class="bar"><b id="progBar"></b></div>
@@ -1081,6 +1112,11 @@ $("btnLink").onclick=async()=>{
   }catch(e){}
   linkUI();
 })();
+
+/* ============ الوضع النهاري / الليلي ============ */
+$("themeSw").checked=false;   // النهاري هو الافتراضي عند كل تشغيل
+document.documentElement.dataset.theme="light";
+$("themeSw").onchange=e=>{document.documentElement.dataset.theme=e.target.checked?"dark":"light"};
 
 /* ============ تشغيل ============ */
 try{

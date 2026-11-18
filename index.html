@@ -548,16 +548,27 @@ window.addEventListener("drop",async e=>{
 const io=new IntersectionObserver(es=>{
   es.forEach(en=>{ if(en.isIntersecting){io.unobserve(en.target);makeThumb(en.target)} });
 },{root:$("thList"),rootMargin:"300px"});
-async function makeThumb(btn){
+let thRun=0;const thQ=[];
+function makeThumb(btn){thQ.push(btn);thPump()}
+function thPump(){
+  while(thRun<2&&thQ.length){
+    const btn=thQ.shift();thRun++;
+    Promise.race([makeThumb1(btn),new Promise(r=>setTimeout(r,20000))]).catch(()=>{}).then(()=>{thRun--;setTimeout(thPump,15)});
+  }
+}
+async function makeThumb1(btn){
   const f=files[+btn.dataset.i];if(!f||f.thumb){return}
   const im=btn.querySelector("img");
   if(f.kind==="pdf"){
     try{
-      const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.file.arrayBuffer())}).promise;
-      const pg=await pdf.getPage(1),vp0=pg.getViewport({scale:1}),vp=pg.getViewport({scale:200/vp0.width});
-      const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;
-      await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
-      f.thumb=await new Promise(r=>c.toBlob(b=>r(URL.createObjectURL(b)),"image/jpeg",.7));pdf.destroy();
+      let pdf=null;
+      try{
+        pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.file.arrayBuffer())}).promise;
+        const pg=await pdf.getPage(1),vp0=pg.getViewport({scale:1}),vp=pg.getViewport({scale:200/vp0.width});
+        const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;
+        await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
+        f.thumb=await new Promise(r=>c.toBlob(b=>r(URL.createObjectURL(b)),"image/jpeg",.7));
+      }finally{if(pdf)try{pdf.destroy()}catch(e){}}
       im.src=f.thumb;return;
     }catch(e){}
   }
@@ -593,8 +604,12 @@ function refreshThumb(i){
 const catOf=id=>cats.find(c=>c.id===id)||{color:"#777",name:"؟"};
 
 /* ============ العارض ============ */
-let sc=1,tx=0,ty=0,iw=0,ih=0,rot=0,fitMode="fit",curUrl=null;
+let sc=1,tx=0,ty=0,iw=0,ih=0,rot=0,fitMode="fit",curUrl=null,curPdf=null,curObs=null,drag=null;
 function show(i){
+  if(typeof cropOn!=="undefined"&&cropOn)endCrop();
+  drag=null;STAGE.classList.remove("drag");
+  if(curPdf){try{curPdf.destroy()}catch(e){}curPdf=null}
+  if(curObs){try{curObs.disconnect()}catch(e){}curObs=null}
   if(i<0||i>=files.length){
     cur=-1;tok++;IMG.hidden=true;$("docView").hidden=true;$("docView").innerHTML="";$("empty").hidden=false;
     ["prev","next","tools","stateBar"].forEach(x=>$(x).hidden=true);return;
@@ -639,9 +654,11 @@ async function loadDoc(f,t){
     if(f.kind==="pdf"){
       const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.file.arrayBuffer())}).promise;
       if(t!==tok){pdf.destroy();return}
+      curPdf=pdf;
       const p1=await pdf.getPage(1),v1=p1.getViewport({scale:1}),ratio=v1.height/v1.width;
       $("fname").textContent=f.name+` — ${pdf.numPages} صفحة`;
-      const obs=new IntersectionObserver(es=>es.forEach(async en=>{
+      const obs=curObs=new IntersectionObserver(es=>es.forEach(async en=>{
+       try{
         if(!en.isIntersecting)return;obs.unobserve(en.target);const el=en.target;
         const pg=await pdf.getPage(+el.dataset.n);if(t!==tok)return;
         const base=Math.min(920,V.clientWidth-40),vp0=pg.getViewport({scale:1}),vp=pg.getViewport({scale:Math.min(3,base*2/vp0.width)});
@@ -649,6 +666,7 @@ async function loadDoc(f,t){
         el.dataset.r=vp.height/vp.width;
         await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
         if(t!==tok)return;el.innerHTML="";el.appendChild(c);applyDoc();
+       }catch(e){}
       }),{root:V,rootMargin:"900px"});
       for(let n=1;n<=pdf.numPages;n++){
         const d=document.createElement("div");d.className="pg";d.dataset.n=n;d.dataset.r=ratio;
@@ -699,10 +717,10 @@ function zoomAt(f,cx,cy){
 }
 const mid=()=>[STAGE.clientWidth/2,STAGE.clientHeight/2];
 STAGE.addEventListener("wheel",e=>{if(cur<0||cropOn||!isImg())return;e.preventDefault();const r=STAGE.getBoundingClientRect();zoomAt(e.deltaY<0?1.15:1/1.15,e.clientX-r.left,e.clientY-r.top)},{passive:false});
-let drag=null;
 STAGE.addEventListener("pointerdown",e=>{if(cur<0||cropOn||!isImg()||e.target.closest("button,.tools"))return;drag={x:e.clientX,y:e.clientY,tx,ty};STAGE.classList.add("drag");STAGE.setPointerCapture(e.pointerId)});
 STAGE.addEventListener("pointermove",e=>{if(!drag)return;tx=drag.tx+e.clientX-drag.x;ty=drag.ty+e.clientY-drag.y;apply()});
 STAGE.addEventListener("pointerup",()=>{drag=null;STAGE.classList.remove("drag")});
+STAGE.addEventListener("pointercancel",()=>{drag=null;STAGE.classList.remove("drag")});
 STAGE.addEventListener("dblclick",e=>{if(cur<0||cropOn||!isImg()||e.target.closest("button,.tools"))return;
   if(fitMode==="fit"){const r=STAGE.getBoundingClientRect();zoomAt(2.2/sc*Math.max(1,sc),e.clientX-r.left,e.clientY-r.top)}else fit("fit")});
 $("zIn").onclick=()=>zoomAt(1.25,...mid());$("zOut").onclick=()=>zoomAt(.8,...mid());
@@ -811,6 +829,7 @@ window.addEventListener("keydown",e=>{
   else if(k==="+"||k==="="){zoomAt(1.25,...mid())}
   else if(k==="-"){zoomAt(.8,...mid())}
   else if(k==="0"){fit("fit")}
+  else if(k==="Escape"){unfreeze();toast("أُعيد ضبط العرض")}
   else if(k==="r"||k==="R"||k==="ق"){rotate(90)}
   else if(k==="Delete"||k==="Backspace"){$("btnClear").click()}
 });
@@ -992,6 +1011,7 @@ async function bake(f,crop){
   const cv=render(bmp,f.rot||0,crop,1);bmp.close&&bmp.close();
   const png=/png/i.test(f.orig.type);
   const blob=await new Promise(r=>cv.toBlob(r,png?"image/png":"image/jpeg",.95));
+  if(!blob)throw new Error("الصورة كبيرة جدًا على المتصفح");
   const base=f.orig.name.replace(/\.[^.]+$/,"");
   f.file=new File([blob],base+(png?".png":".jpg"),{type:blob.type,lastModified:f.orig.lastModified});
   f.name=f.file.name;f.rot=0;f.edited=true;
@@ -1000,7 +1020,7 @@ async function bake(f,crop){
   if(b){b.querySelector("img").removeAttribute("src");makeThumb(b)}
   resync(f);
 }
-$("btnSave").onclick=async()=>{if(cur<0)return;const f=files[cur];await bake(f);show(cur);toast("تم حفظ التدوير في الصورة")};
+$("btnSave").onclick=async()=>{if(cur<0)return;const f=files[cur];try{await bake(f);show(cur);toast("تم حفظ التدوير في الصورة")}catch(e){toast("تعذر الحفظ: "+(e.message||""),3500)}};
 $("btnOrig").onclick=()=>{
   if(cur<0)return;const f=files[cur];f.file=f.orig;f.name=f.orig.name;f.rot=0;f.edited=false;
   if(f.thumb){URL.revokeObjectURL(f.thumb);f.thumb=null}
@@ -1028,7 +1048,8 @@ $("btnCrop").onclick=startCrop;$("cNo").onclick=endCrop;$("cOk").onclick=applyCr
 async function applyCrop(){
   if(!cropOn)return;const b=bbox(),f=files[cur];
   const crop={x:(cr.x-b.l)/b.w,y:(cr.y-b.t)/b.h,w:cr.w/b.w,h:cr.h/b.h};
-  endCrop();await bake(f,crop);show(cur);toast("تم القص. التعديل محفوظ في الصورة");
+  endCrop();
+  try{await bake(f,crop);show(cur);toast("تم القص. التعديل محفوظ في الصورة")}catch(e){toast("تعذر القص: "+(e.message||""),3500);show(cur)}
 }
 $("cAuto").onclick=async()=>{
   const f=files[cur];const bmp=await createImageBitmap(f.file);
@@ -1081,7 +1102,7 @@ async function fileHash(file){
   try{
     if(window.crypto&&crypto.subtle){
       let buf;
-      if(file.size<=200*1048576)buf=await file.arrayBuffer();
+      if(file.size<=40*1048576)buf=await file.arrayBuffer();
       else{const M=1048576,parts=[file.slice(0,M),file.slice(Math.floor(file.size/2),Math.floor(file.size/2)+M),file.slice(file.size-M)];
         buf=await new Blob([...parts,String(file.size)]).arrayBuffer()}
       const d=await crypto.subtle.digest("SHA-256",buf);
@@ -1115,6 +1136,7 @@ async function checkDupes(list){
   let disk=null;const found=[];
   for(const f of list){
     if(!files.includes(f))continue;
+    await new Promise(r=>setTimeout(r,20));
     try{
       f.hash=await fileHash(f.file);
       let d=null;
@@ -1215,7 +1237,10 @@ async function bmpToCanvas(bmp,max){
 }
 let ocrChain=Promise.resolve();
 function inOcrQueue(f,job){ // يتخطى الملف إن لم يعد معروضًا
-  const p=ocrChain.then(()=>{if(files[cur]!==f)return null;return job()});
+  const p=ocrChain.then(()=>{if(files[cur]!==f)return null;
+    return Promise.race([job(),new Promise((_,rej)=>setTimeout(()=>{
+      OCR.stat="";if(OCR.w){try{OCR.w.terminate()}catch(e){}OCR.w=null;OCR.loading=null}
+      rej(new Error("انتهت مهلة القراءة الضوئية"))},150000))])});
   ocrChain=p.catch(()=>{});return p;
 }
 async function extractText(f){
@@ -1415,7 +1440,20 @@ try{
   pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([document.getElementById("pdfWorker").textContent],{type:"text/javascript"}));
 }catch(e){}
 renderCats();refreshAll();show(-1);
-window.__fariz={buildZip,plan,files,cats,connect}; // للاختبار
+function unfreeze(){
+  try{if(cropOn)endCrop()}catch(e){}
+  drag=null;cd=null;STAGE.classList.remove("drag");closeAll();
+  try{if(cur>=0){buildThumbs();show(cur)}else refreshAll()}catch(e){}
+}
+let errT=0;
+function onFail(e){
+  const now=Date.now();if(now-errT<4000)return;errT=now;
+  try{console.error(e&&e.reason||e&&e.error||e)}catch(_){}
+  try{unfreeze();toast("حصل خلل بسيط وأعدت ضبط العرض تلقائيًا",3000)}catch(_){}
+}
+window.addEventListener("error",e=>{if(e.target&&e.target!==window)return;onFail(e)});
+window.addEventListener("unhandledrejection",e=>{try{console.warn(e.reason)}catch(_){}});
+window.__fariz={unfreeze,buildZip,plan,files,cats,connect}; // للاختبار
 </script>
 </body>
 </html>

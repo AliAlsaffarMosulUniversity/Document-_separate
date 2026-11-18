@@ -239,6 +239,7 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
   </div>
   <button class="hbtn" id="btnAdd">📂 إضافة ملفات</button>
   <button class="hbtn" id="btnAddDir">📁 إضافة مجلد</button>
+  <button class="hbtn" id="btnLink">🔗 ربط بمجلد الحاسوب</button>
   <button class="hbtn" id="btnHelp">⌨️ الاختصارات</button>
   <button class="hbtn pri" id="btnDl" disabled>⬇️ تحميل حسب التوزيع</button>
 </header>
@@ -297,6 +298,7 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
       <button class="link" id="btnManage">✏️ تعديل الأزرار</button>
       <label><input type="checkbox" id="optAuto"> الانتقال للتالي بعد كل نقرة</label>
       <label><input type="checkbox" id="optMulti" checked> أكثر من جانب للملف الواحد</label>
+      <small id="linkStat"></small>
       <small id="catHint"></small>
     </div>
   </section>
@@ -331,6 +333,11 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
 </div></div>
 
 <!-- نافذة إدارة الأزرار -->
+<div class="modal" id="mLink"><div class="card" style="width:min(520px,100%)">
+  <h3>الربط بمجلد الحاسوب <button class="x" data-close>✕</button></h3>
+  <div class="bd" id="linkBody"></div>
+  <div class="ft" id="linkFt"></div>
+</div></div>
 <div class="modal" id="mDel"><div class="card" style="width:min(460px,100%)">
   <h3>حذف جميع الملفات <button class="x" data-close>✕</button></h3>
   <div class="bd"><div class="msg" id="delAllTxt" style="font-size:15px;color:var(--txt)"></div></div>
@@ -607,7 +614,7 @@ STAGE.addEventListener("dblclick",e=>{if(cur<0||cropOn||!isImg()||e.target.close
   if(fitMode==="fit"){const r=STAGE.getBoundingClientRect();zoomAt(2.2/sc*Math.max(1,sc),e.clientX-r.left,e.clientY-r.top)}else fit("fit")});
 $("zIn").onclick=()=>zoomAt(1.25,...mid());$("zOut").onclick=()=>zoomAt(.8,...mid());
 $("zFit").onclick=()=>fit("fit");$("zW").onclick=()=>fit("width");
-function rotate(d){if(cur<0||cropOn||!isImg())return;rot+=d;files[cur].rot=rot;fit(fitMode==="width"?"width":"fit")}
+function rotate(d){if(cur<0||cropOn||!isImg())return;rot+=d;files[cur].rot=rot;fit(fitMode==="width"?"width":"fit");refreshAll()}
 $("rotR").onclick=()=>rotate(90);$("rotL").onclick=()=>rotate(-90);
 window.addEventListener("resize",()=>{if(!isImg()){if(cur>=0)applyDoc();return}if(fitMode!=="free")fit(fitMode)});
 $("prev").onclick=()=>go(cur-1);$("next").onclick=()=>go(cur+1);
@@ -629,14 +636,18 @@ function renderCats(){
   $("catHint").textContent="المفاتيح 1–9 تفعّل الأزرار";
 }
 function toggle(id,force){
-  if(cur<0){toast("أضف صورًا أولًا");return}
-  const f=files[cur];const has=f.cats.has(id);
+  if(cur<0){toast("أضف ملفات أولًا");return}
+  const f=files[cur];const has=f.cats.has(id),prev=new Set(f.cats);
   if(has&&force!==true)f.cats.delete(id);
   else{ if(!$("optMulti").checked)f.cats.clear(); f.cats.add(id) }
   persist();refreshAll();
+  if(root){
+    [...prev].filter(x=>!f.cats.has(x)).forEach(x=>unsyncOne(f,x));
+    [...f.cats].filter(x=>!prev.has(x)).forEach(x=>syncOne(f,x,true));
+  }
   if($("optAuto").checked&&f.cats.size&&cur<files.length-1)setTimeout(()=>go(cur+1),160);
 }
-$("btnClear").onclick=()=>{if(cur<0)return;files[cur].cats.clear();persist();refreshAll()};
+$("btnClear").onclick=()=>{if(cur<0)return;const f=files[cur];if(root)[...f.cats].forEach(x=>unsyncOne(f,x));f.cats.clear();persist();refreshAll()};
 function dropFiles(list){
   list.forEach(f=>{
     delete saved[f.key];
@@ -734,7 +745,7 @@ function renderEdit(){
   });
   const m=document.createElement("div");m.className="msg";m.textContent="انقر المربع الملون لتغيير اللون. الأزرار التسعة الأولى لها اختصار من لوحة المفاتيح.";B.appendChild(m);
 }
-function saveCats(){lsSet(LS+".cats",cats);renderCats();refreshAll()}
+function saveCats(){lsSet(LS+".cats",cats);renderCats();refreshAll();if(root)makeCatDirs()}
 $("btnManage").onclick=()=>{renderEdit();open("mCat")};
 $("catAdd").onclick=()=>{cats.push({id:"c"+Date.now(),name:"جانب جديد",color:PALETTE[cats.length%PALETTE.length]});saveCats();renderEdit();
   const ins=$("catEdit").querySelectorAll("input");ins[ins.length-1]&&ins[ins.length-1].select()};
@@ -885,13 +896,14 @@ async function bake(f,crop){
   if(f.thumb){URL.revokeObjectURL(f.thumb);f.thumb=null}
   const i=files.indexOf(f),b=$("thList").children[i];
   if(b){b.querySelector("img").removeAttribute("src");makeThumb(b)}
+  resync(f);
 }
 $("btnSave").onclick=async()=>{if(cur<0)return;const f=files[cur];await bake(f);show(cur);toast("تم حفظ التدوير في الصورة")};
 $("btnOrig").onclick=()=>{
   if(cur<0)return;const f=files[cur];f.file=f.orig;f.name=f.orig.name;f.rot=0;f.edited=false;
   if(f.thumb){URL.revokeObjectURL(f.thumb);f.thumb=null}
   const b=$("thList").children[cur];if(b){b.querySelector("img").removeAttribute("src");makeThumb(b)}
-  show(cur);toast("رجعت الصورة الأصلية");
+  show(cur);resync(f);toast("رجعت الصورة الأصلية");
 };
 $("btnOne").onclick=async()=>{if(cur<0)return;const f=files[cur];if(f.kind==="img"&&f.rot%360)await bake(f);download(f.file,f.name);toast("تم تحميل الصورة")};
 /* وضع القص */
@@ -957,12 +969,124 @@ CR.addEventListener("pointermove",e=>{
 });
 CR.addEventListener("pointerup",()=>cd=null);
 
+/* ============ الربط بمجلد الحاسوب ============ */
+const ROOT_NAME="فارز الوثائق";
+let root=null,parentName="",pending=null;
+function idbDo(mode,fn){return new Promise((res,rej)=>{
+  const r=indexedDB.open("fariz",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");
+  r.onsuccess=()=>{const tx=r.result.transaction("kv",mode),q=fn(tx.objectStore("kv"));tx.oncomplete=()=>res(q&&q.result);tx.onerror=()=>rej(tx.error)};
+  r.onerror=()=>rej(r.error)})}
+const idbGet=()=>idbDo("readonly",st=>st.get("root")).catch(()=>null);
+const idbPut=h=>idbDo("readwrite",st=>st.put(h,"root")).catch(()=>{});
+const idbDel=()=>idbDo("readwrite",st=>st.delete("root")).catch(()=>{});
+async function makeCatDirs(){
+  if(!root)return;
+  for(const c of cats){try{await root.getDirectoryHandle(safe(c.name),{create:true})}catch(e){}}
+}
+async function connect(handle){
+  root=handle.name===ROOT_NAME?handle:await handle.getDirectoryHandle(ROOT_NAME,{create:true});
+  parentName=handle.name===ROOT_NAME?"":handle.name;pending=null;
+  await makeCatDirs();linkUI();
+}
+function linkUI(){
+  const b=$("btnLink");
+  if(root){b.textContent="✅ مرتبط بالحاسوب";b.style.borderColor="var(--acc)";$("linkStat").textContent=`الحفظ المباشر إلى: ${parentName?parentName+" ◂ ":""}${ROOT_NAME}`;$("linkStat").style.color="var(--acc)"}
+  else if(pending){b.textContent="🔗 إعادة تفعيل الربط";b.style.borderColor="var(--acc2)";$("linkStat").textContent="الربط محفوظ. انقر «إعادة تفعيل الربط» لمتابعة الحفظ المباشر.";$("linkStat").style.color="var(--acc2)"}
+  else{b.textContent="🔗 ربط بمجلد الحاسوب";b.style.borderColor="";$("linkStat").textContent="";}
+}
+function lost(e){
+  if(e&&(e.name==="NotAllowedError"||e.name==="NotFoundError"||e.name==="SecurityError")){
+    pending=pending||null;root=null;linkUI();toast("انقطع الربط بالمجلد. انقر زر الربط لإعادة تفعيله",3500);
+  }
+}
+async function syncOne(f,catId,say){
+  if(!root)return false;
+  try{
+    const c=catOf(catId),dir=await root.getDirectoryHandle(safe(c.name),{create:true});
+    if(f.kind==="img"&&f.rot%360)await bake(f);
+    const blob=f.file;f.synced=f.synced||{};
+    let name=f.synced[catId]||safe(f.name),n=name,t=2;
+    for(;;){
+      let ex=null;try{ex=await dir.getFileHandle(n)}catch(e){}
+      if(!ex||f.synced[catId]===n)break;
+      if((await ex.getFile()).size===blob.size)break;
+      const d=name.lastIndexOf(".");n=(d>0?name.slice(0,d):name)+"_"+t+(d>0?name.slice(d):"");t++;
+    }
+    const fh=await dir.getFileHandle(n,{create:true}),w=await fh.createWritable();
+    await w.write(blob);await w.close();f.synced[catId]=n;
+    say&&toast(`✓ حُفظ في مجلد «${c.name}»`);
+    return true;
+  }catch(e){lost(e);if(say)toast("تعذر الحفظ المباشر: "+(e.message||e.name),3500);return false}
+}
+async function unsyncOne(f,catId){
+  const n=f.synced&&f.synced[catId];if(!n||!root)return;
+  try{const dir=await root.getDirectoryHandle(safe(catOf(catId).name));await dir.removeEntry(n);toast(`أُزيل من مجلد «${catOf(catId).name}»`)}catch(e){}
+  delete f.synced[catId];
+}
+async function resync(f){
+  if(!root||!f.synced||!Object.keys(f.synced).length)return;
+  for(const id of Object.keys(f.synced)){
+    const old=f.synced[id];
+    try{const dir=await root.getDirectoryHandle(safe(catOf(id).name));await dir.removeEntry(old)}catch(e){}
+    delete f.synced[id];
+    if(f.cats.has(id))await syncOne(f,id,false);
+  }
+  toast("تم تحديث الملف المعدّل في المجلد");
+}
+async function syncAll(){
+  let n=0;
+  for(const f of files)for(const id of f.cats){if(await syncOne(f,id,false))n++}
+  toast(`تمت مزامنة ${n} نسخة إلى المجلدات`);
+}
+function linkModal(){
+  const B=$("linkBody"),F=$("linkFt");F.innerHTML="";
+  if(root){
+    B.innerHTML=`<div class="msg" style="font-size:15px;color:var(--txt)">الربط فعّال. كل ملف تضغط له زر جانب يُنسخ فورًا إلى مجلده في حاسوبك.</div>
+    <div class="msg">المسار: ${esc(parentName?parentName+" ◂ ":"")}${ROOT_NAME} ◂ (مجلد لكل زر)<br>إلغاء تفعيل الزر يزيل النسخة من مجلده.<br>حذف الملف من قائمة التطبيق لا يحذف النسخة المحفوظة في الحاسوب.</div>`;
+    const a=document.createElement("button");a.className="hbtn pri";a.textContent="🔄 مزامنة كل الملفات المصنفة الآن";a.onclick=()=>{closeAll();syncAll()};
+    const b=document.createElement("button");b.className="hbtn";b.textContent="📂 تغيير المجلد";b.onclick=()=>{closeAll();pickDir()};
+    const c=document.createElement("button");c.className="hbtn";c.textContent="⛔ فك الربط";c.onclick=async()=>{root=null;pending=null;await idbDel();linkUI();closeAll();toast("تم فك الربط")};
+    F.append(a,b,c);
+  }else{
+    B.innerHTML=`<div class="msg" style="font-size:15px;color:var(--txt)">اختر مجلدًا على حاسوبك مرة واحدة، مثل المستندات أو سطح المكتب.</div>
+    <div class="msg">سينشئ التطبيق داخله مجلدًا باسم «${ROOT_NAME}»، وبداخله مجلد لكل زر تصنيف.<br>بعدها يُحفظ كل ملف تصنفه في مجلده مباشرة.<br>الميزة تعمل في متصفحي كروم وإيدج.</div>`;
+    const a=document.createElement("button");a.className="hbtn pri";a.textContent="📂 اختيار المجلد";a.onclick=()=>{closeAll();pickDir()};F.append(a);
+  }
+  open("mLink");
+}
+async function pickDir(){
+  if(!window.showDirectoryPicker){toast("هذه الميزة تحتاج متصفح كروم أو إيدج",3500);return}
+  try{
+    const h=await showDirectoryPicker({id:"fariz",mode:"readwrite",startIn:"documents"});
+    await connect(h);await idbPut(h);
+    toast(`تم الربط. أُنشئ المجلد «${ROOT_NAME}» ومجلدات الأزرار`,3500);
+    if(files.some(f=>f.cats.size))linkModalAsk();
+  }catch(e){if(e.name!=="AbortError")toast("تعذر الربط: "+e.message,3500)}
+}
+function linkModalAsk(){if(confirm("توجد ملفات مصنفة سابقًا. هل تريد نسخها الآن إلى المجلدات؟"))syncAll()}
+$("btnLink").onclick=async()=>{
+  if(pending&&!root){
+    try{
+      if(await pending.requestPermission({mode:"readwrite"})==="granted"){await connect(pending);toast("عاد الربط للعمل");return}
+    }catch(e){}
+  }
+  linkModal();
+};
+(async()=>{
+  const h=await idbGet();if(!h)return;
+  try{
+    pending=h;
+    if(await h.queryPermission({mode:"readwrite"})==="granted")await connect(h);
+  }catch(e){}
+  linkUI();
+})();
+
 /* ============ تشغيل ============ */
 try{
   pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([document.getElementById("pdfWorker").textContent],{type:"text/javascript"}));
 }catch(e){}
 renderCats();refreshAll();show(-1);
-window.__fariz={buildZip,plan,files,cats}; // للاختبار
+window.__fariz={buildZip,plan,files,cats,connect}; // للاختبار
 </script>
 </body>
 </html>

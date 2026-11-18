@@ -626,14 +626,14 @@ function show(i){
   tok++;$("docView").hidden=f.kind==="img";$("docView").innerHTML="";
   if(f.kind!=="img"){
     IMG.hidden=true;if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}
-    refreshAll();loadDoc(f,tok);analyze(f);
+    refreshAll();{const my=tok;setTimeout(()=>{if(my===tok&&files[cur]===f){loadDoc(f,my);analyze(f)}},120)}
     const b=$("thList").children[i];b&&b.scrollIntoView({block:"nearest",behavior:"smooth"});return;
   }
   if(curUrl)URL.revokeObjectURL(curUrl);
   curUrl=URL.createObjectURL(f.file);rot=f.rot||0;
   IMG.hidden=false;IMG.onload=()=>{iw=IMG.naturalWidth;ih=IMG.naturalHeight;fit("fit")};
   IMG.src=curUrl;
-  analyze(f);
+  {const my=tok;setTimeout(()=>{if(my===tok&&files[cur]===f)analyze(f)},350)}
   // تحميل مسبق للتالية
   if(files[i+1]&&files[i+1].kind==="img"){const p=new Image();const u=URL.createObjectURL(files[i+1].file);p.onload=p.onerror=()=>URL.revokeObjectURL(u);p.src=u}
   refreshAll();
@@ -663,17 +663,29 @@ async function loadDoc(f,t){
       curPdf=pdf;
       const p1=await pdf.getPage(1),v1=p1.getViewport({scale:1}),ratio=v1.height/v1.width;
       $("fname").textContent=f.name+` — ${pdf.numPages} صفحة`;
-      const obs=curObs=new IntersectionObserver(es=>es.forEach(async en=>{
-       try{
-        if(!en.isIntersecting)return;obs.unobserve(en.target);const el=en.target;
-        const pg=await pdf.getPage(+el.dataset.n);if(t!==tok)return;
-        const base=Math.min(920,V.clientWidth-40),vp0=pg.getViewport({scale:1}),vp=pg.getViewport({scale:Math.min(3,base*2/vp0.width)});
-        const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;
-        el.dataset.r=vp.height/vp.width;
-        await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
-        if(t!==tok)return;el.innerHTML="";el.appendChild(c);applyDoc();
-       }catch(e){}
-      }),{root:V,rootMargin:"900px"});
+      const rq=[];let rrun=0;
+      const rpump=()=>{
+        while(rrun<2&&rq.length){
+          const el=rq.shift();if(t!==tok){rq.length=0;return}
+          rrun++;
+          (async()=>{
+            try{
+              const pg=await pdf.getPage(+el.dataset.n);if(t!==tok)return;
+              const base=Math.min(920,V.clientWidth-40),vp0=pg.getViewport({scale:1});
+              let k=Math.min(2.5,base*1.6/vp0.width);const px=vp0.width*vp0.height;if(px*k*k>7e6)k=Math.sqrt(7e6/px);
+              const vp=pg.getViewport({scale:k});
+              const c=document.createElement("canvas");c.width=Math.max(1,Math.floor(vp.width));c.height=Math.max(1,Math.floor(vp.height));
+              el.dataset.r=vp.height/vp.width;
+              await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
+              if(t!==tok)return;el.innerHTML="";el.appendChild(c);applyDoc();
+            }catch(e){}
+          })().then(()=>{rrun--;setTimeout(rpump,10)});
+        }
+      };
+      const obs=curObs=new IntersectionObserver(es=>{
+        es.forEach(en=>{if(!en.isIntersecting)return;obs.unobserve(en.target);rq.push(en.target)});
+        rpump();
+      },{root:V,rootMargin:"300px"});
       for(let n=1;n<=pdf.numPages;n++){
         const d=document.createElement("div");d.className="pg";d.dataset.n=n;d.dataset.r=ratio;
         d.innerHTML='<div class="ld">…</div>';V.appendChild(d);obs.observe(d);
@@ -746,11 +758,11 @@ function renderCats(){
   cats.forEach((c,i)=>{
     while(cnt[idx]===0)idx++;
     const b=document.createElement("button");b.className="cat";b.style.setProperty("--col",c.color);b.dataset.id=c.id;b.title=c.name+" — Ctrl+نقرة لفتح مجلده";
-    b.innerHTML=`<span class="k">${i<9?i+1:""}</span><span class="n"></span><span class="c">0</span>`;
+    b.innerHTML=`<span class="k">${i+1}</span><span class="n"></span><span class="c">0</span>`;
     b.querySelector(".n").textContent=c.name;b.onclick=e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();openCatFolder(c.id);return}toggle(c.id)};
     sides[idx].appendChild(b);cnt[idx]--;
   });
-  $("catHint").textContent="المفاتيح 1–9 تفعّل الأزرار";
+  $("catHint").textContent="المفاتيح 1–9 للأزرار الأولى، و Shift+1…9 للأزرار 10–18";
 }
 async function openCatFolder(id){
   if(!root){toast("اربط التطبيق بمجلد الحاسوب أولًا (زر الربط)",3000);return}
@@ -845,7 +857,9 @@ window.addEventListener("keydown",e=>{
   const k=e.key;
   if(k==="c"||k==="C"||k==="ؤ"){startCrop();return}
   if(k==="s"||k==="S"||k==="س"){const r=cur>=0&&suggestFor(files[cur]);if(r){toggle(r[0].id,true)}return}
-  if(/^[1-9]$/.test(k)){const c=cats[+k-1];c&&toggle(c.id);e.preventDefault()}
+  const dm=/^(?:Digit|Numpad)([0-9])$/.exec(e.code||"");
+  if(dm&&e.shiftKey&&!e.ctrlKey&&!e.altKey){const n=+dm[1],c=cats[(n===0?10:n)+8];c&&toggle(c.id);e.preventDefault()}
+  else if(/^[1-9]$/.test(k)){const c=cats[+k-1];c&&toggle(c.id);e.preventDefault()}
   else if(k==="ArrowRight"||k===" "||k==="Enter"){go(cur+1);e.preventDefault()}
   else if(k==="ArrowLeft"){go(cur-1);e.preventDefault()}
   else if(k==="+"||k==="="){zoomAt(1.25,...mid())}

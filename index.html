@@ -872,7 +872,10 @@ window.addEventListener("keydown",e=>{
 
 /* ============ نوافذ ============ */
 function open(id){$(id).classList.add("show")}
-function closeAll(){document.querySelectorAll(".modal").forEach(m=>m.classList.remove("show"))}
+function closeAll(){
+  document.querySelectorAll(".modal").forEach(m=>m.classList.remove("show"));
+  if(catsDirty){catsDirty=false;if(root)makeCatDirs()}
+}
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=closeAll);
 document.querySelectorAll(".modal").forEach(m=>m.addEventListener("mousedown",e=>{if(e.target===m)closeAll()}));
 $("btnHelp").onclick=()=>open("mHelp");
@@ -902,7 +905,8 @@ function renderEdit(){
   });
   const m=document.createElement("div");m.className="msg";m.textContent="السطر تحت كل زر فيه الكلمات التي يبحث عنها التطبيق في نص الملف لاقتراح الزر. انقر المربع الملون لتغيير اللون. الأزرار التسعة الأولى لها اختصار من لوحة المفاتيح.";B.appendChild(m);
 }
-function saveCats(){lsSet(LS+".cats",cats);renderCats();refreshAll();if(root)makeCatDirs()}
+function saveCats(){lsSet(LS+".cats",cats);renderCats();refreshAll();catsDirty=true}
+let catsDirty=false;
 $("btnManage").onclick=()=>{renderEdit();open("mCat")};
 $("catAdd").onclick=()=>{cats.push({id:"c"+Date.now(),name:"جانب جديد",color:PALETTE[cats.length%PALETTE.length]});saveCats();renderEdit();
   const ins=$("catEdit").querySelectorAll("input");ins[ins.length-1]&&ins[ins.length-1].select()};
@@ -1360,6 +1364,20 @@ async function makeCatDirs(){
   if(!root)return;
   for(const c of cats){try{await root.getDirectoryHandle(safe(c.name),{create:true})}catch(e){}}
 }
+async function cleanEmptyDirs(){
+  if(!root){toast("اربط التطبيق بالمجلد أولًا");return}
+  const keep=new Set(cats.map(c=>safe(c.name)));let n=0,skipped=0;
+  try{
+    const del=[];
+    for await(const [name,h] of root.entries()){
+      if(h.kind!=="directory"||keep.has(name))continue;
+      let empty=true;for await(const _ of h.entries()){empty=false;break}
+      if(empty)del.push(name);else skipped++;
+    }
+    for(const name of del){try{await root.removeEntry(name);n++}catch(e){}}
+  }catch(e){toast("تعذر التنظيف: "+(e.message||e.name),3500);return}
+  toast(`حُذف ${n} مجلد فارغ غير مستخدم`+(skipped?` — وبقي ${skipped} مجلد فيه ملفات`:""),4500);
+}
 async function connect(handle){
   root=handle.name===ROOT_NAME?handle:await handle.getDirectoryHandle(ROOT_NAME,{create:true});
   parentName=handle.name===ROOT_NAME?"":handle.name;pending=null;
@@ -1430,7 +1448,10 @@ function linkModal(){
     const a=document.createElement("button");a.className="hbtn pri";a.textContent="🔄 مزامنة كل الملفات المصنفة الآن";a.onclick=()=>{closeAll();syncAll()};
     const b=document.createElement("button");b.className="hbtn";b.textContent="📂 تغيير المجلد";b.onclick=()=>{closeAll();pickDir()};
     const c=document.createElement("button");c.className="hbtn";c.textContent="⛔ فك الربط";c.onclick=async()=>{root=null;pending=null;await idbDel();linkUI();closeAll();toast("تم فك الربط")};
-    F.append(a,b,c);
+    const d=document.createElement("button");d.className="hbtn";d.textContent="🧹 حذف المجلدات الفارغة الزائدة";
+    d.title="يحذف المجلدات الفارغة التي ليست أسماء أزرار حالية. لا يمس أي مجلد فيه ملفات.";
+    d.onclick=()=>{if(confirm("سيُحذف كل مجلد فارغ داخل DOCS لا يطابق اسم زر حالي. المجلدات التي فيها ملفات لن تُمس. متابعة؟")){closeAll();cleanEmptyDirs()}};
+    F.append(a,d,b,c);
   }else{
     B.innerHTML=`<div class="msg" style="font-size:15px;color:var(--txt)">اسمح للتطبيق بإنشاء مجلد على سطح المكتب باسم:<br><bdi dir="ltr" style="font-weight:800;color:var(--acc2)">${ROOT_NAME}</bdi></div>
     <div class="msg">بداخله مجلد لكل زر تصنيف. وكل ملف تصنفه يُحفظ فيه مباشرة.<br><br>الخطوات:<br>١. انقر زر «اختيار سطح المكتب» أدناه.<br>٢. ستفتح نافذة على سطح المكتب. انقر الزر:<br><bdi dir="ltr" style="color:var(--txt);font-weight:700">Select Folder</bdi><br>٣. ستظهر رسالة طلب إذن. انقر الزر:<br><bdi dir="ltr" style="color:var(--txt);font-weight:700">Edit files</bdi><br><br>تُطلب هذه الموافقة مرة واحدة فقط.<br>الميزة تعمل في متصفحي كروم وإيدج.</div>`;
@@ -1489,7 +1510,7 @@ function onFail(e){
 }
 window.addEventListener("error",e=>{if(e.target&&e.target!==window)return;onFail(e)});
 window.addEventListener("unhandledrejection",e=>{try{console.warn(e.reason)}catch(_){}});
-window.__fariz={unfreeze,buildZip,plan,files,cats,connect}; // للاختبار
+window.__fariz={cleanEmptyDirs,unfreeze,buildZip,plan,files,cats,connect}; // للاختبار
 </script>
 </body>
 </html>

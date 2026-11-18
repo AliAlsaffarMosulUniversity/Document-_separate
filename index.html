@@ -252,6 +252,13 @@ html .crow input[type=text]{border-color:var(--frame)}
 html .gold{border:1.5px solid var(--frame)}
 html .nav{border:1.5px solid var(--frame)}
 html .tsw input:focus-visible+.tr{outline-color:var(--frame)}
+/* تنبيه التكرار */
+#dupBanner{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:7;display:none;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;
+  background:#b3261e;color:#fff;padding:9px 14px;border-radius:12px;border:2px solid #ffd84a;font-weight:700;font-size:14px;box-shadow:0 8px 28px #0007;max-width:92%}
+#dupBanner.on{display:flex}
+#dupBanner button{background:#fff;color:#7a120d;border-radius:8px;padding:5px 12px;font-weight:800;font-size:12.5px}
+#dupBanner button:hover{background:#ffe9a8}
+.th.dup::after{content:"⚠";position:absolute;bottom:3px;inset-inline-end:3px;background:#b3261e;color:#fff;border-radius:6px;font-size:12px;padding:0 5px;z-index:3}
 /* الاقتراح */
 #sugg{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .sgx{font-size:12.5px;color:var(--mut)}
@@ -321,6 +328,7 @@ body,header,aside,.cside,.card,.hbtn,.cat,#stateBar,#optBar{transition:backgroun
     <div class="cside" id="catBottom"></div>
     <div id="stage">
       <img id="img" alt="" draggable="false" hidden>
+      <div id="dupBanner"></div>
       <div id="docView" hidden></div>
       <div id="empty">
         <div class="box">
@@ -455,6 +463,7 @@ const DEFAULT_CATS=[
   ["كتب شكر وتقدير",5],["شهادات مشاركة",6],["بحوث منشورة",7],["مناصب إدارية",8],["تدريس ومقررات",9]
 ].map((a,i)=>({id:"c"+i,name:a[0],color:PALETTE[a[1]]}));
 const LS="fariz.v1";
+let seenDB={};
 let cats=[],files=[],cur=-1,saved={};
 const $=id=>document.getElementById(id);
 const IMG=$("img"),STAGE=$("stage");
@@ -464,6 +473,7 @@ function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 cats=lsGet(LS+".cats")||JSON.parse(JSON.stringify(DEFAULT_CATS));
 saved=lsGet(LS+".assign")||{};
+seenDB=lsGet(LS+".seen")||{};
 const opts=Object.assign({auto:false,multi:true,ocr:true,autoSug:false},lsGet(LS+".opts")||{});
 $("optAuto").checked=opts.auto;$("optMulti").checked=opts.multi;$("optOcr").checked=opts.ocr;$("optAutoSug").checked=opts.autoSug;
 function saveOpts(){lsSet(LS+".opts",{auto:$("optAuto").checked,multi:$("optMulti").checked,ocr:$("optOcr").checked,autoSug:$("optAutoSug").checked})}
@@ -474,6 +484,8 @@ const keyOf=f=>f.name+"|"+f.size+"|"+f.lastModified;
 function persist(){
   files.forEach(f=>{ if(f.cats.size) saved[f.key]=[...f.cats]; else delete saved[f.key]; });
   lsSet(LS+".assign",saved);
+  let ch=false;files.forEach(f=>{if(f.hash&&typeof seenDB!=="undefined"){const e=seenDB[f.hash];if(e){const c=[...f.cats].map(id=>catOf(id).name);if(JSON.stringify(e.c)!==JSON.stringify(c)){e.c=c;ch=true}}}});
+  if(ch)seenSave();
 }
 function toast(t,ms=2200){const e=$("toast");e.textContent=t;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),ms)}
 
@@ -494,20 +506,22 @@ function addFiles(list){
   const arr=[...list].filter(f=>!/^(~\$|\.|thumbs\.db$|desktop\.ini$)/i.test(f.name));
   if(!arr.length){toast("لم أجد ملفات في الاختيار");return}
   arr.sort((a,b)=>collator.compare(a.webkitRelativePath||a.name,b.webkitRelativePath||b.name));
-  const seen=new Set(files.map(f=>f.key));
-  let added=0,restored=0;
+  const seenK=new Set(files.map(f=>f.key));
+  let added=0,restored=0,skipped=0;const fresh=[];
   for(const file of arr){
     const key=keyOf(file);
-    if(seen.has(key))continue;
-    seen.add(key);
+    if(seenK.has(key)){skipped++;continue}
+    seenK.add(key);
     const set=new Set((saved[key]||[]).filter(id=>cats.some(c=>c.id===id)));
     if(set.size)restored++;
-    files.push({file,orig:file,key,name:file.name,kind:kindOf(file),cats:set,rot:0,thumb:null,edited:false});
+    const nf={file,orig:file,key,name:file.name,kind:kindOf(file),cats:set,rot:0,thumb:null,edited:false,resumed:!!saved[key]};
+    files.push(nf);fresh.push(nf);
     added++;
   }
-  toast(`أُضيفت ${added} ملف`+(restored?` — واسترجعت تصنيف ${restored} منها`:""));
+  toast(`أُضيفت ${added} ملف`+(restored?` — واسترجعت تصنيف ${restored} منها`:"")+(skipped?` — وتجاهلت ${skipped} مضافة سابقًا في القائمة`:""),3200);
   if(cur<0&&files.length)cur=0;
   buildThumbs();show(cur);refreshAll();
+  checkDupes(fresh);
 }
 $("fileIn").onchange=e=>{addFiles(e.target.files);e.target.value=""};
 $("dirIn").onchange=e=>{addFiles(e.target.files);e.target.value=""};
@@ -573,7 +587,7 @@ function buildThumbs(){
 }
 function refreshThumb(i){
   const b=$("thList").children[i];if(!b)return;const f=files[i];
-  b.classList.toggle("un",!f.cats.size);b.classList.toggle("cur",i===cur);
+  b.classList.toggle("un",!f.cats.size);b.classList.toggle("cur",i===cur);b.classList.toggle("dup",!!(f.dup&&!f.dupIgnored));
   b.querySelector(".dots").innerHTML=[...f.cats].map(id=>`<i style="--col:${catOf(id).color}"></i>`).join("");
 }
 const catOf=id=>cats.find(c=>c.id===id)||{color:"#777",name:"؟"};
@@ -779,7 +793,7 @@ function refreshAll(){
   $("thCount").textContent=n?n+" صورة":"";
   $("btnDl").disabled=!done;
   files.forEach((_,i)=>refreshThumb(i));
-  renderSugg();
+  renderSugg();renderDup();
 }
 const esc=s=>String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 
@@ -1057,6 +1071,85 @@ CR.addEventListener("pointermove",e=>{
 });
 CR.addEventListener("pointerup",()=>cd=null);
 
+/* ============ كشف الملفات المكررة / المحفوظة سابقًا ============ */
+function seenSave(){
+  const k=Object.keys(seenDB);
+  if(k.length>4000){k.sort((a,b)=>seenDB[a].t-seenDB[b].t).slice(0,600).forEach(x=>delete seenDB[x])}
+  lsSet(LS+".seen",seenDB);
+}
+async function fileHash(file){
+  try{
+    if(window.crypto&&crypto.subtle){
+      let buf;
+      if(file.size<=200*1048576)buf=await file.arrayBuffer();
+      else{const M=1048576,parts=[file.slice(0,M),file.slice(Math.floor(file.size/2),Math.floor(file.size/2)+M),file.slice(file.size-M)];
+        buf=await new Blob([...parts,String(file.size)]).arrayBuffer()}
+      const d=await crypto.subtle.digest("SHA-256",buf);
+      return[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,"0")).join("");
+    }
+  }catch(e){}
+  let h=2166136261;const u=new Uint8Array(await file.slice(0,262144).arrayBuffer());
+  for(let i=0;i<u.length;i++){h^=u[i];h=Math.imul(h,16777619)>>>0}
+  return"f"+file.size+"-"+h;
+}
+const diskHashC={};
+async function diskList(){
+  const out=[];if(!root)return out;
+  for(const c of cats){
+    let dir;try{dir=await root.getDirectoryHandle(safe(c.name))}catch(e){continue}
+    try{for await(const [n,h] of dir.entries()){if(h.kind==="file")out.push({cat:c,name:n,h})}}catch(e){}
+  }
+  return out;
+}
+async function diskMatch(hash,size,list,skip){
+  for(const d of list){
+    if(skip&&skip(d))continue;
+    const fl=await d.h.getFile();if(fl.size!==size)continue;
+    const key=d.cat.id+"/"+d.name+"/"+fl.size+"/"+fl.lastModified;
+    const hh=diskHashC[key]||(diskHashC[key]=await fileHash(fl));
+    if(hh===hash)return d;
+  }
+  return null;
+}
+async function checkDupes(list){
+  let disk=null;const found=[];
+  for(const f of list){
+    if(!files.includes(f))continue;
+    try{
+      f.hash=await fileHash(f.file);
+      let d=null;
+      if(root){if(!disk)disk=await diskList();const m=await diskMatch(f.hash,f.file.size,disk);if(m)d={msg:`هذا الملف محفوظ سابقًا في مجلد «${m.cat.name}»`}}
+      if(!d){
+        const earlier=files.find(x=>x!==f&&x.hash===f.hash&&files.indexOf(x)<files.indexOf(f));
+        if(earlier)d={msg:`هذا الملف مكرر في القائمة (مثل «${earlier.name}»)`};
+      }
+      const e=seenDB[f.hash];
+      if(!d&&e&&!f.resumed&&(e.k!==f.key||(e.c&&e.c.length))){
+        d={msg:e.c&&e.c.length?`هذا الملف فُرز سابقًا في: ${e.c.join("، ")}`:`هذا الملف أُضيف سابقًا باسم «${e.n}»`};
+      }
+      if(d){f.dup=d;found.push(f)}
+      if(!seenDB[f.hash])seenDB[f.hash]={n:f.name,k:f.key,c:[...f.cats].map(id=>catOf(id).name),t:Date.now()};
+    }catch(e){}
+  }
+  seenSave();refreshAll();
+  if(found.length===1)toast("⚠ "+found[0].dup.msg,4500);
+  else if(found.length>1)toast(`⚠ تنبيه: ${found.length} ملفات محفوظة سابقًا أو مكررة. علامة ⚠ على المصغرات`,5000);
+}
+function removeFile(f){
+  const i=files.indexOf(f);if(i<0)return;
+  files.splice(i,1);dropFiles([f]);afterRemove(i);
+}
+function renderDup(){
+  const B=$("dupBanner");
+  if(cur<0){B.classList.remove("on");return}
+  const f=files[cur];
+  if(!f.dup||f.dupIgnored){B.classList.remove("on");return}
+  B.innerHTML='<span>⚠ '+esc(f.dup.msg)+'</span><button id="dupDel">🗑 حذف من القائمة</button><button id="dupIgn">إبقاؤه</button>';
+  B.classList.add("on");
+  $("dupDel").onclick=()=>{removeFile(f);toast("حُذف الملف المكرر من القائمة")};
+  $("dupIgn").onclick=()=>{f.dupIgnored=true;refreshAll()};
+}
+
 /* ============ الاقتراح من محتوى الملف ============ */
 const DEFAULT_KW={
  "دورات تدريبية":"دورة، دورة تدريبية، دورة تطويرية، تدريبية، اجتياز الدورة، المتدرب، training course, course completion",
@@ -1228,6 +1321,13 @@ async function syncOne(f,catId,say){
     const c=catOf(catId),dir=await root.getDirectoryHandle(safe(c.name),{create:true});
     if(f.kind==="img"&&f.rot%360)await bake(f);
     const blob=f.file;f.synced=f.synced||{};
+    {
+      const hh=f.hashOf===blob?f.hashV:(f.hashV=await fileHash(blob),f.hashOf=blob,f.hashV);
+      const list=await diskList();
+      const m=await diskMatch(hh,blob.size,list,d=>f.synced[d.cat.id]===d.name);
+      if(m&&m.cat.id===catId){say&&toast(`⚠ الملف موجود سابقًا في مجلد «${c.name}» (باسم ${m.name}). لم يُنسخ مرة أخرى`,4500);return true}
+      if(m&&say)toast(`ملاحظة: نسخة مطابقة موجودة سابقًا في مجلد «${m.cat.name}»`,3500);
+    }
     let name=f.synced[catId]||safe(f.name),n=name,t=2;
     for(;;){
       let ex=null;try{ex=await dir.getFileHandle(n)}catch(e){}

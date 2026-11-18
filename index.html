@@ -142,7 +142,7 @@ aside{background:var(--panel);min-height:0;display:flex;flex-direction:column}
 #empty .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:76px;border-radius:14px;background:#000a;backdrop-filter:blur(4px);font-size:26px;z-index:3;transition:.15s}
 .nav:hover{background:var(--acc);color:#04211c}
-#prev{right:14px}#next{left:14px}
+#next{right:14px}#prev{left:14px}
 #prev,#next{top:auto;bottom:14px;transform:none;height:64px}
 .tools{position:absolute;top:10px;left:10px;display:flex;flex-direction:column;align-items:stretch;gap:2px;background:#000b;backdrop-filter:blur(6px);padding:5px;border-radius:12px;z-index:3}
 .tools button{background:none;padding:5px 8px;border-radius:8px;font-size:12.5px;white-space:nowrap;text-align:center}
@@ -350,8 +350,8 @@ body,header,aside,.cside,.card,.hbtn,.cat,#stateBar,#optBar{transition:backgroun
           </div>
         </div>
       </div>
-      <button class="nav" id="prev" title="السابقة" hidden>›</button>
-      <button class="nav" id="next" title="التالية" hidden>‹</button>
+      <button class="nav" id="prev" title="السابقة (←)" hidden>‹</button>
+      <button class="nav" id="next" title="التالية (→)" hidden>›</button>
       <div id="crop"><div id="cropRect"><i class="hd" data-h="nw"></i><i class="hd" data-h="n"></i><i class="hd" data-h="ne"></i><i class="hd" data-h="e"></i><i class="hd" data-h="se"></i><i class="hd" data-h="s"></i><i class="hd" data-h="sw"></i><i class="hd" data-h="w"></i></div></div>
       <div id="cropBar"><span class="msg">حدّد المنطقة بسحب الحواف</span><button class="hbtn" id="cAuto">✨ قص تلقائي</button><button class="hbtn pri" id="cOk">✓ تطبيق القص</button><button class="hbtn" id="cNo">✕ إلغاء</button></div>
       <div class="tools" id="tools" hidden>

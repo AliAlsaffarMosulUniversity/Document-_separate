@@ -227,6 +227,31 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
 .fcard h3{font-size:19px;margin-bottom:8px;direction:ltr;word-break:break-all}
 .fcard p{color:var(--mut);line-height:1.9}
 .hidden-io .io{display:none}
+/* ===== إطارات الأزرار والنوافذ (مارووني نهارًا / أصفر ليلًا) ===== */
+html header{border-bottom:2px solid var(--frame)}
+html .cside{border:0}
+html #catTop{border-bottom:2px solid var(--frame)}
+html #catBottom{border-top:2px solid var(--frame)}
+html #stateBar{border-top:2px solid var(--frame)}
+html #optBar{border-top:2px solid var(--frame)}
+html #thumbs{border-inline-start:2px solid var(--frame)}
+html .side-h{border-bottom:2px solid var(--frame)}
+html #stage{box-shadow:inset 0 0 0 2px var(--frame)}
+html .hbtn,html .sbtn{border:1.5px solid var(--frame)}
+html .hbtn.pri{border:1.5px solid var(--frame)}
+html .cat{border-block-color:var(--frame);border-inline-end-color:var(--frame)}
+html .cat.on{border-block-color:var(--frame);border-inline-end-color:var(--frame);box-shadow:0 0 0 2px var(--frame),0 4px 16px #0005}
+html .tr{border:2px solid var(--frame)}
+html .card{border:2px solid var(--frame)}
+html .card h3,html .card .ft{border-color:var(--frame)}
+html .tools,html #cropBar{border:1.5px solid var(--frame)}
+html .th{border:2px solid var(--frame)}
+html .th.cur{border-color:var(--acc2);box-shadow:0 0 0 2px var(--frame)}
+html #empty .box{border-color:var(--frame)}
+html .crow input[type=text]{border-color:var(--frame)}
+html .gold{border:1.5px solid var(--frame)}
+html .nav{border:1.5px solid var(--frame)}
+html .tsw input:focus-visible+.tr{outline-color:var(--frame)}
 /* مفتاح الوضع */
 .tsw{position:relative;display:inline-block;cursor:pointer;flex:none}
 .tsw input{position:absolute;opacity:0;width:0;height:0}
@@ -237,21 +262,24 @@ td .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:
 .tsw input:checked+.tr .kn{transform:translateX(36px);background:#dfe8ff}
 .tsw input:focus-visible+.tr{outline:2px solid var(--acc);outline-offset:2px}
 /* الوضع النهاري */
-html[data-theme=light]{--bg:#edf1f6;--panel:#ffffff;--panel2:#f0f4f8;--line:#d5dee8;--txt:#16212c;--mut:#5b6e82;--acc:#10a08c;--acc2:#e0a100}
-html[data-theme=light] #stage{background:repeating-conic-gradient(#dde5ee 0 25%,#e8eef5 0 50%) 0 0/24px 24px}
-html[data-theme=light] #docView{background:#cdd7e2}
-html[data-theme=light] .hbtn:hover{background:#e3edf6}
-html[data-theme=light] .cat:hover{background:#e3edf6}
+html[data-theme=light]{--bg:#e4ddd2;--panel:#f1ebe1;--panel2:#e8e1d5;--line:#cbbfae;--txt:#2b1a1d;--mut:#76666a;--acc:#8a2434;--acc2:#c58a00;--frame:#7a1c2b}
+html[data-theme=dark]{--frame:#f7c81c}
+html[data-theme=light] #stage{background:repeating-conic-gradient(#d7cfc2 0 25%,#e1d9cc 0 50%) 0 0/24px 24px}
+html[data-theme=light] #docView{background:#cfc6b8}
+html[data-theme=light] #docView .pg,html[data-theme=light] #docView .docx-wrapper>section.docx{filter:brightness(.955) sepia(.06)}
+html[data-theme=light] #img{filter:brightness(.97)}
+html[data-theme=light] .hbtn:hover{background:#ddd3c4}
+html[data-theme=light] .cat:hover{background:#ddd3c4}
 html[data-theme=light] .cat .k,html[data-theme=light] .cat .c{background:#0000001a}
 html[data-theme=light] .cat.on .k,html[data-theme=light] .cat.on .c{background:#0000002e}
-html[data-theme=light] .tools,html[data-theme=light] #cropBar{background:#ffffffe6;box-shadow:0 4px 16px #0003}
+html[data-theme=light] .tools,html[data-theme=light] #cropBar{background:#f1ebe1ee;box-shadow:0 4px 16px #0003}
 html[data-theme=light] .tools button:hover{background:#0001}
-html[data-theme=light] .nav{background:#ffffffd9;color:#16212c;box-shadow:0 3px 12px #0003}
+html[data-theme=light] .nav{background:#f1ebe1e6;color:#2b1a1d;box-shadow:0 3px 12px #0003}
 html[data-theme=light] .nav:hover{background:var(--acc);color:#fff}
-html[data-theme=light] #cropBar .msg{color:#16212c}
-html[data-theme=light] #empty .box{background:#ffffff99}
-html[data-theme=light] .hbtn.pri{color:#fff}
-html[data-theme=light] .modal{background:#0a1a2a88}
+html[data-theme=light] #cropBar .msg{color:#2b1a1d}
+html[data-theme=light] #empty .box{background:#f1ebe199}
+html[data-theme=light] .hbtn.pri{color:#fff4ea}
+html[data-theme=light] .modal{background:#2b1a1d88}
 html[data-theme=light] #img{box-shadow:0 10px 40px #0004}
 html[data-theme=light] .th .no{background:#000a;color:#fff}
 html[data-theme=light] header,html[data-theme=light] .cside,html[data-theme=light] #stateBar,html[data-theme=light] #optBar{box-shadow:0 1px 0 var(--line)}
